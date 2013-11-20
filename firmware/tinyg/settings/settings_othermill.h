@@ -31,7 +31,7 @@
  *		 to be changed are in tinyg.h
  */
 
-#define __DEBUG // debug settings that make a Zen 7x12 look mechanically like an othermill
+//#define __DEBUG // debug settings that make a Zen 7x12 look mechanically like an othermill
 
 /***********************************************************************/
 /**** Otherlab OtherMill profile ***************************************/
@@ -75,7 +75,7 @@
 #define COM_ENABLE_QR			true
 
 #undef 	QR_VERBOSITY
-#define QR_VERBOSITY			QR_VERBOSE
+#define QR_VERBOSITY			QR_SINGLE
 
 #undef COM_ENABLE_FLOW_CONTROL
 #define COM_ENABLE_FLOW_CONTROL		FLOW_CONTROL_XON
@@ -106,14 +106,14 @@
 
 #define M3_MOTOR_MAP 			AXIS_Y
 #define M3_STEP_ANGLE 			1.8
-#define M4_TRAVEL_PER_REV 		5.08				// 1tr
+#define M3_TRAVEL_PER_REV 		5.08				// 1tr
 #define M3_MICROSTEPS 			8
 #define M3_POLARITY 			1
 #define M3_POWER_MODE 			0					
 
 #define M2_MOTOR_MAP 			AXIS_Z
-#define M2_STEP_ANGLE 			15
-#define M2_TRAVEL_PER_REV 		1.27
+#define M2_STEP_ANGLE 			1.80 		// 15
+#define M2_TRAVEL_PER_REV 		5.08		// 1.27
 #define M2_MICROSTEPS 			8
 #define M2_POLARITY 			1
 #define M2_POWER_MODE 			0					
@@ -183,7 +183,7 @@
 #define A_AXIS_MODE 			AXIS_RADIUS
 #define A_VELOCITY_MAX 			((X_VELOCITY_MAX/M1_TRAVEL_PER_REV)*360) // set to the same speed as X axis
 #define A_FEEDRATE_MAX 			A_VELOCITY_MAX
-#define A_TRAVEL_MAX 			-1
+#define A_TRAVEL_MIN 			-1
 #define A_TRAVEL_MAX 			-1					// -1 means infinite, no limit
 #define A_JERK_MAX 				(X_JERK_MAX*(360/M1_TRAVEL_PER_REV))
 #define A_JUNCTION_DEVIATION	JUNCTION_DEVIATION
