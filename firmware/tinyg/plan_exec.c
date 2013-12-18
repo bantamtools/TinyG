@@ -31,7 +31,7 @@
 #include "planner.h"
 #include "kinematics.h"
 #include "stepper.h"
-//#include "encoder.h"
+#include "encoder.h"
 #include "report.h"
 #include "util.h"
 //#include "xio.h"			// uncomment for debugging
@@ -449,7 +449,6 @@ static stat_t _exec_aline_tail()
 /*
  * _exec_aline_segment() - segment runner helper
  */
-#define __ORIG_CORRECTION_CODE
 static stat_t _exec_aline_segment(uint8_t correction_flag)
 {
 	float travel[AXES];
@@ -473,45 +472,44 @@ static stat_t _exec_aline_segment(uint8_t correction_flag)
 			mr.gm.target[i] = mr.position[i] + (mr.unit[i] * intermediate);
 		}
 	}
-#else	// different error correction
+#else	// new error correction
 	// Multiply computed length by the unit vector to get the contribution for each axis. 
 	// Set the target in absolute coords and compute relative steps.
 	// Don't do the endpoint correction if you are going into a hold
 	if ((correction_flag == true) && (mr.segment_count == 1) && 
 		(cm.motion_state == MOTION_RUN) && (cm.cycle_state == CYCLE_MACHINING)) {
-		printf("M[2]:%0.4f, %0.4f\n", (double)mr.gm.target[AXIS_Z], (double)mr.endpoint[AXIS_Z]);	// +++++ DIAGNOSTIC
+
+		printf("M[0]:%0.4f, %0.4f\n", (double)mr.gm.target[AXIS_X], (double)mr.target[AXIS_X]);	// +++++ DIAGNOSTIC
+		printf("M[1]:%0.4f, %0.4f\n", (double)mr.gm.target[AXIS_Y], (double)mr.target[AXIS_Y]);	// +++++ DIAGNOSTIC
+		printf("M[2]:%0.4f, %0.4f\n", (double)mr.gm.target[AXIS_Z], (double)mr.target[AXIS_Z]);	// +++++ DIAGNOSTIC
+
 		// A positive correction means that distance will be added to the subsequent moves,
 		// looked at another way, that the target fell short of the endpoint. Neg is opposite.
 		for (i=0; i<AXES; i++) {
-			mr.position_correction[i] += (mr.endpoint[i] - mr.gm.target[i]);
+			mr.position_correction[i] += (mr.target[i] - mr.gm.target[i]);
 		}
 	} else {
-		float intermediate = mr.segment_velocity * mr.segment_move_time;
+		float segment_length = mr.segment_velocity * mr.segment_time;
 		for (i=0; i<AXES; i++) {
-			mr.gm.target[i] = mr.position[i] + (mr.unit[i] * intermediate);
+			mr.gm.target[i] = mr.position[i] + (mr.unit[i] * segment_length);
 		}
 	}
 	// corrected for position error
-	for (i=0; i<AXES; i++) {
+	for (i=0; i<AXIS_A; i++) {			// NOTE - only 3 axes.
 		if (fabs(mr.position_correction[i]) > MIN_CORRECTION_MM) {
 			mr.gm.target[i] += min(mr.position_correction[i], MAX_CORRECTION_MM);
 			mr.position_correction[i] -= min(mr.position_correction[i], MAX_CORRECTION_MM);
-			if (i == AXIS_Z) {
+//			if (i == AXIS_Z) {
 				printf("C[%d]:%0.4f, %0.4f\n", i, (double)mr.gm.target[AXIS_Z], (double)mr.position_correction[AXIS_Z]);	// +++++ DIAGNOSTIC
-			}
+//			}			
 		}
 	}
-
 #endif
+	for (i=0; i<AXES; i++) {
+		travel[i] = mr.gm.target[i] - mr.position[i];
+	}
 
-	travel[AXIS_X] = mr.gm.target[AXIS_X] - mr.position[AXIS_X];
-	travel[AXIS_Y] = mr.gm.target[AXIS_Y] - mr.position[AXIS_Y];
-	travel[AXIS_Z] = mr.gm.target[AXIS_Z] - mr.position[AXIS_Z];
-	travel[AXIS_A] = mr.gm.target[AXIS_A] - mr.position[AXIS_A];
-	travel[AXIS_B] = mr.gm.target[AXIS_B] - mr.position[AXIS_B];
-	travel[AXIS_C] = mr.gm.target[AXIS_C] - mr.position[AXIS_C];
-
-/* The above is a re-arranged and loop unrolled version of this:
+/* The above is a re-arranged version of this:
 	for (uint8_t i=0; i < AXES; i++) {	// don't do the error correction if you are going into a hold
 		if ((correction_flag == true) && (mr.segment_count == 1) && 
 			(cm.motion_state == MOTION_RUN) && (cm.cycle_state == CYCLE_STARTED)) {
@@ -523,7 +521,7 @@ static stat_t _exec_aline_segment(uint8_t correction_flag)
 	}
 */
 	// prep the segment for the steppers and adjust the variables for the next iteration
-	ik_kinematics(travel, steps, mr.microseconds);
+	ik_kinematics(travel, steps);
 	if (st_prep_line(steps, mr.microseconds) == STAT_OK) {
 		copy_axis_vector(mr.position, mr.gm.target); 	// update runtime position	
 		mr.elapsed_accel_time += mr.segment_accel_time;	// line needed by __JERK_EXEC

@@ -25,45 +25,29 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF
  * OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-/* 	This module provides the low-level stepper drivers and some related
- * 	functions. It dequeues lines queued by the motor_queue routines.
- * 	This is some of the most heavily optimized code in the project.
- *
- *	Note that if you want to use this for something other than TinyG
- *	you may need to stretch the step pulses. They run about 1 uSec 
- *	which is fine for the TI DRV8811/DRV8818 chips in TinyG but may 
- *	not suffice for other stepper driver hardware.
- */
-/* 
- * See stepper.h for a detailed explanation of this module
+/* 	This module provides the low-level stepper drivers and some related functions.
+ *	See stepper.h for a detailed explanation of this module.
  */
 
 #include "tinyg.h"
 #include "config.h"
 #include "stepper.h"
+#include "encoder.h"
 #include "planner.h"
 #include "hardware.h"
 #include "text_parser.h"
 #include "util.h"
 
-//#define ENABLE_DIAGNOSTICS
-#ifdef ENABLE_DIAGNOSTICS
-#define INCREMENT_DIAGNOSTIC_COUNTER(motor) st_run.m[motor].step_count_diagnostic++;
-#else
-#define INCREMENT_DIAGNOSTIC_COUNTER(motor)	// choose this one to disable counters
-#endif
-
 /**** Allocate structures ****/
 
-stConfig_t st;
+stConfig_t st_cfg;
 static stRunSingleton_t st_run;
-static stPrepSingleton_t st_prep;
+static stPrepSingleton_t st_pre;
 
 /**** Setup local functions ****/
 
 static void _load_move(void);
 static void _request_load_move(void);
-//static void _clear_diagnostic_counters(void);
 
 // handy macro
 #define _f_to_period(f) (uint16_t)((float)F_CPU / (float)f)
@@ -85,9 +69,9 @@ static void _request_load_move(void);
 void stepper_init()
 {
 	memset(&st_run, 0, sizeof(st_run));			// clear all values, pointers and status
+//	stepper_init_assertions();
 	st_run.magic_start = MAGICNUM;
-	st_prep.magic_start = MAGICNUM;
-//	_clear_diagnostic_counters();
+	st_pre.magic_start = MAGICNUM;
 
 	// Configure virtual ports
 	PORTCFG.VPCTRLA = PORTCFG_VP0MAP_PORT_MOTOR_1_gc | PORTCFG_VP1MAP_PORT_MOTOR_2_gc;
@@ -120,7 +104,8 @@ void stepper_init()
 	TIMER_EXEC.INTCTRLA = TIMER_EXEC_INTLVL;	// interrupt mode
 	TIMER_EXEC.PER = SWI_PERIOD;				// set period
 
-	st_prep.exec_state = PREP_BUFFER_OWNED_BY_EXEC;
+	st_pre.exec_state = PREP_BUFFER_OWNED_BY_EXEC;
+//	st_reset();									// reset steppers to known state
 }
 
 /*
@@ -129,7 +114,7 @@ void stepper_init()
 stat_t st_assertions()
 {
 	if (st_run.magic_start  != MAGICNUM) return (STAT_MEMORY_FAULT);
-	if (st_prep.magic_start != MAGICNUM) return (STAT_MEMORY_FAULT);
+	if (st_pre.magic_start != MAGICNUM) return (STAT_MEMORY_FAULT);
 	return (STAT_OK);
 }
 
@@ -142,6 +127,46 @@ uint8_t stepper_isbusy()
 		return (false);
 	} 
 	return (true);
+}
+
+/*
+ * st_reset() - reset stepper internals
+ * st_cycle_start() - Initializes values for beginning a new cycle.
+ * st_cycle_end()
+ * st_clc()
+ *
+ * st_cycle_start() is called from cm_cycle_start().  
+ */
+
+void st_reset()
+{
+	for (uint8_t i=0; i<MOTORS; i++) {
+		st_pre.mot[MOTOR_1].direction_change = true;
+		st_run.mot[MOTOR_1].substep_accumulator = 0;			// will become max negative during per-motor setup;
+	}
+//	en_reset_encoders();
+}
+
+void st_cycle_start(void)
+{
+/*
+	st_pre.cycle_start = true;		// triggers stepper resets
+	for (uint8_t i=0; i<MOTORS; i++) {
+		st_pre.mot[i].cycle_start = true;
+	}
+	en_reset_encoders();
+*/
+}
+
+void st_cycle_end(void)
+{
+	mp_print_motor_positions();
+}
+
+stat_t st_clc(cmdObj_t *cmd)	// clear diagnostic counters, reset stepper prep
+{
+	st_cycle_end();
+	return(STAT_OK);
 }
 
 /*
@@ -162,8 +187,8 @@ static void _energize_motor(const uint8_t motor)
 		case (MOTOR_3): { PORT_MOTOR_3_VPORT.OUT &= ~MOTOR_ENABLE_BIT_bm; break; }
 		case (MOTOR_4): { PORT_MOTOR_4_VPORT.OUT &= ~MOTOR_ENABLE_BIT_bm; break; }
 	}
-//	st_run.m[motor].power_state = MOTOR_POWERED;
-	st_run.m[motor].power_state = MOTOR_START_IDLE_TIMEOUT;
+//	st_run.mot[motor].power_state = MOTOR_POWERED;
+	st_run.mot[motor].power_state = MOTOR_START_IDLE_TIMEOUT;
 }
 
 static void _deenergize_motor(const uint8_t motor)
@@ -174,7 +199,7 @@ static void _deenergize_motor(const uint8_t motor)
 		case (MOTOR_3): { PORT_MOTOR_3_VPORT.OUT |= MOTOR_ENABLE_BIT_bm; break; }
 		case (MOTOR_4): { PORT_MOTOR_4_VPORT.OUT |= MOTOR_ENABLE_BIT_bm; break; }
 	}
-	st_run.m[motor].power_state = MOTOR_OFF;
+	st_run.mot[motor].power_state = MOTOR_OFF;
 }
 
 static void _set_motor_power_level(const uint8_t motor, const float power_level)
@@ -186,7 +211,7 @@ void st_energize_motors()
 {
 	for (uint8_t motor = MOTOR_1; motor < MOTORS; motor++) {
 		_energize_motor(motor);
-		st_run.m[motor].power_state = MOTOR_START_IDLE_TIMEOUT;
+		st_run.mot[motor].power_state = MOTOR_START_IDLE_TIMEOUT;
 	}
 }
 
@@ -202,43 +227,43 @@ stat_t st_motor_power_callback() 	// called by controller
 	// manage power for each motor individually - facilitates advanced features
 	for (uint8_t motor = MOTOR_1; motor < MOTORS; motor++) {
 
-		if (st.m[motor].power_mode == MOTOR_ENERGIZED_DURING_CYCLE) {
+		if (st_cfg.mot[motor].power_mode == MOTOR_ENERGIZED_DURING_CYCLE) {
 
-			switch (st_run.m[motor].power_state) {
+			switch (st_run.mot[motor].power_state) {
 				case (MOTOR_START_IDLE_TIMEOUT): {
-					st_run.m[motor].power_systick = SysTickTimer_getValue() + (uint32_t)(st.motor_idle_timeout * 1000);
-					st_run.m[motor].power_state = MOTOR_TIME_IDLE_TIMEOUT;
+					st_run.mot[motor].power_systick = SysTickTimer_getValue() + (uint32_t)(st_cfg.motor_idle_timeout * 1000);
+					st_run.mot[motor].power_state = MOTOR_TIME_IDLE_TIMEOUT;
 					break;
 				}
 
 				case (MOTOR_TIME_IDLE_TIMEOUT): {
-					if (SysTickTimer_getValue() > st_run.m[motor].power_systick ) { 
-						st_run.m[motor].power_state = MOTOR_IDLE;
+					if (SysTickTimer_getValue() > st_run.mot[motor].power_systick ) { 
+						st_run.mot[motor].power_state = MOTOR_IDLE;
 						_deenergize_motor(motor);
 					}
 					break;
 				}
 			}
-		} else if(st.m[motor].power_mode == MOTOR_IDLE_WHEN_STOPPED) {
-			switch (st_run.m[motor].power_state) {
+		} else if(st_cfg.mot[motor].power_mode == MOTOR_IDLE_WHEN_STOPPED) {
+			switch (st_run.mot[motor].power_state) {
 				case (MOTOR_START_IDLE_TIMEOUT): {
-					st_run.m[motor].power_systick = SysTickTimer_getValue() + (uint32_t)(250);
-					st_run.m[motor].power_state = MOTOR_TIME_IDLE_TIMEOUT;
+					st_run.mot[motor].power_systick = SysTickTimer_getValue() + (uint32_t)(250);
+					st_run.mot[motor].power_state = MOTOR_TIME_IDLE_TIMEOUT;
 					break;
 				}
 
 				case (MOTOR_TIME_IDLE_TIMEOUT): {
-					if (SysTickTimer_getValue() > st_run.m[motor].power_systick ) { 
-						st_run.m[motor].power_state = MOTOR_IDLE;
+					if (SysTickTimer_getValue() > st_run.mot[motor].power_systick ) { 
+						st_run.mot[motor].power_state = MOTOR_IDLE;
 						_deenergize_motor(motor);
 					}
 					break;
 				}
 			}
 
-//		} else if(st_run.m[motor].power_mode == MOTOR_POWER_REDUCED_WHEN_IDLE) {	// future
+//		} else if(st_run.mot[motor].power_mode == MOTOR_POWER_REDUCED_WHEN_IDLE) {	// future
 			
-//		} else if(st_run.m[motor].power_mode == DYNAMIC_MOTOR_POWER) {				// future
+//		} else if(st_run.mot[motor].power_mode == DYNAMIC_MOTOR_POWER) {				// future
 			
 		}
 	}
@@ -261,32 +286,66 @@ stat_t st_motor_power_callback() 	// called by controller
  */
 
 ISR(TIMER_DDA_ISR_vect)
-{
-	if ((st_run.m[MOTOR_1].phase_accumulator += st_run.m[MOTOR_1].phase_increment) > 0) {
+/*{
+	if ((st_run.mot[MOTOR_1].substep_accumulator += st_run.mot[MOTOR_1].substep_increment) > 0) {
 		PORT_MOTOR_1_VPORT.OUT |= STEP_BIT_bm;		// turn step bit on
- 		st_run.m[MOTOR_1].phase_accumulator -= st_run.dda_ticks_X_substeps;
+ 		st_run.mot[MOTOR_1].substep_accumulator -= st_run.dda_ticks_X_substeps;
 		PORT_MOTOR_1_VPORT.OUT &= ~STEP_BIT_bm;		// turn step bit off in ~1 uSec
 	}
-	if ((st_run.m[MOTOR_2].phase_accumulator += st_run.m[MOTOR_2].phase_increment) > 0) {
+	if ((st_run.mot[MOTOR_2].substep_accumulator += st_run.mot[MOTOR_2].substep_increment) > 0) {
 		PORT_MOTOR_2_VPORT.OUT |= STEP_BIT_bm;
- 		st_run.m[MOTOR_2].phase_accumulator -= st_run.dda_ticks_X_substeps;
+ 		st_run.mot[MOTOR_2].substep_accumulator -= st_run.dda_ticks_X_substeps;
 		PORT_MOTOR_2_VPORT.OUT &= ~STEP_BIT_bm;
 	}
-	if ((st_run.m[MOTOR_3].phase_accumulator += st_run.m[MOTOR_3].phase_increment) > 0) {
+	if ((st_run.mot[MOTOR_3].substep_accumulator += st_run.mot[MOTOR_3].substep_increment) > 0) {
 		PORT_MOTOR_3_VPORT.OUT |= STEP_BIT_bm;
- 		st_run.m[MOTOR_3].phase_accumulator -= st_run.dda_ticks_X_substeps;
+ 		st_run.mot[MOTOR_3].substep_accumulator -= st_run.dda_ticks_X_substeps;
 		PORT_MOTOR_3_VPORT.OUT &= ~STEP_BIT_bm;
 	}
-	if ((st_run.m[MOTOR_4].phase_accumulator += st_run.m[MOTOR_4].phase_increment) > 0) {
+	if ((st_run.mot[MOTOR_4].substep_accumulator += st_run.mot[MOTOR_4].substep_increment) > 0) {
 		PORT_MOTOR_4_VPORT.OUT |= STEP_BIT_bm;
- 		st_run.m[MOTOR_4].phase_accumulator -= st_run.dda_ticks_X_substeps;
+ 		st_run.mot[MOTOR_4].substep_accumulator -= st_run.dda_ticks_X_substeps;
 		PORT_MOTOR_4_VPORT.OUT &= ~STEP_BIT_bm;
 	}
 	if (--st_run.dda_ticks_downcount == 0) {			// end move
 		TIMER_DDA.CTRLA = STEP_TIMER_DISABLE;			// disable DDA timer
 		_load_move();									// load the next move
 	}
+}*/
+{
+	if ((st_run.mot[MOTOR_1].substep_accumulator += st_run.mot[MOTOR_1].substep_increment) > 0) {
+		PORT_MOTOR_1_VPORT.OUT |= STEP_BIT_bm;		// turn step bit on
+		st_run.mot[MOTOR_1].substep_accumulator -= st_run.dda_ticks_X_substeps;
+		en.en[MOTOR_1].steps_run += en.en[MOTOR_1].step_sign;
+	}
+	if ((st_run.mot[MOTOR_2].substep_accumulator += st_run.mot[MOTOR_2].substep_increment) > 0) {
+		PORT_MOTOR_2_VPORT.OUT |= STEP_BIT_bm;
+		st_run.mot[MOTOR_2].substep_accumulator -= st_run.dda_ticks_X_substeps;
+		en.en[MOTOR_2].steps_run += en.en[MOTOR_2].step_sign;
+	}
+	if ((st_run.mot[MOTOR_3].substep_accumulator += st_run.mot[MOTOR_3].substep_increment) > 0) {
+		PORT_MOTOR_3_VPORT.OUT |= STEP_BIT_bm;
+		st_run.mot[MOTOR_3].substep_accumulator -= st_run.dda_ticks_X_substeps;
+		en.en[MOTOR_3].steps_run += en.en[MOTOR_3].step_sign;
+	}
+	if ((st_run.mot[MOTOR_4].substep_accumulator += st_run.mot[MOTOR_4].substep_increment) > 0) {
+		PORT_MOTOR_4_VPORT.OUT |= STEP_BIT_bm;
+		st_run.mot[MOTOR_4].substep_accumulator -= st_run.dda_ticks_X_substeps;
+		en.en[MOTOR_4].steps_run += en.en[MOTOR_4].step_sign;
+	}
+
+	// pulse stretching for using external drivers.- turn step bits off
+	PORT_MOTOR_1_VPORT.OUT &= ~STEP_BIT_bm;				// ~ 5 uSec pulse width
+	PORT_MOTOR_2_VPORT.OUT &= ~STEP_BIT_bm;				// ~ 4 uSec
+	PORT_MOTOR_3_VPORT.OUT &= ~STEP_BIT_bm;				// ~ 3 uSec
+	PORT_MOTOR_4_VPORT.OUT &= ~STEP_BIT_bm;				// ~ 2 uSec
+
+	if (--st_run.dda_ticks_downcount != 0) return;
+
+	TIMER_DDA.CTRLA = STEP_TIMER_DISABLE;				// disable DDA timer
+	_load_move();										// load the next move
 }
+
 
 ISR(TIMER_DWELL_ISR_vect) {								// DWELL timer interrupt
 	if (--st_run.dda_ticks_downcount == 0) {
@@ -305,9 +364,9 @@ ISR(TIMER_EXEC_ISR_vect) {								// exec move SW interrupt
  	TIMER_EXEC.CTRLA = STEP_TIMER_DISABLE;				// disable SW interrupt timer
 
 	// exec_move
-   	if (st_prep.exec_state == PREP_BUFFER_OWNED_BY_EXEC) {
+   	if (st_pre.exec_state == PREP_BUFFER_OWNED_BY_EXEC) {
 	   	if (mp_exec_move() != STAT_NOOP) {
-		   	st_prep.exec_state = PREP_BUFFER_OWNED_BY_LOADER; // flip it back
+		   	st_pre.exec_state = PREP_BUFFER_OWNED_BY_LOADER; // flip it back
 		   	_request_load_move();
 	   	}
    	}
@@ -327,7 +386,7 @@ ISR(TIMER_EXEC_ISR_vect) {								// exec move SW interrupt
 
 void st_request_exec_move()
 {
-	if (st_prep.exec_state == PREP_BUFFER_OWNED_BY_EXEC) {	// bother interrupting
+	if (st_pre.exec_state == PREP_BUFFER_OWNED_BY_EXEC) {	// bother interrupting
 		TIMER_EXEC.PER = SWI_PERIOD;
 		TIMER_EXEC.CTRLA = STEP_TIMER_ENABLE;			// trigger a LO interrupt
 	}
@@ -352,133 +411,136 @@ static void _request_load_move()
 
 static void _load_move()
 {
+	// Be aware that dda_ticks_downcount must equal zero for the loader to run.
+	// So the initial load must also have this set to zero as part of initialization
 	if (st_run.dda_ticks_downcount != 0) return;					// exit if it's still busy
 
-	if (st_prep.exec_state != PREP_BUFFER_OWNED_BY_LOADER) {		// if there are no moves to load...
+	if (st_pre.exec_state != PREP_BUFFER_OWNED_BY_LOADER) {		// if there are no moves to load...
 		for (uint8_t motor = MOTOR_1; motor < MOTORS; motor++) {
-			st_run.m[motor].power_state = MOTOR_START_IDLE_TIMEOUT;	// ...start motor power timeouts
+			st_run.mot[motor].power_state = MOTOR_START_IDLE_TIMEOUT;	// ...start motor power timeouts
 		}
 		return;
 	}
 
 	// handle aline loads first (most common case)  NB: there are no more lines, only alines
-	if (st_prep.move_type == MOVE_TYPE_ALINE) {
-		st_run.dda_ticks_downcount = st_prep.dda_ticks;
-		st_run.dda_ticks_X_substeps = st_prep.dda_ticks_X_substeps;
-		TIMER_DDA.PER = st_prep.dda_period;
+	if (st_pre.move_type == MOVE_TYPE_ALINE) {
 
-		// This section is somewhat optimized for execution speed 
-		// All axes must set steps and compensate for out-of-range pulse phasing. 
-		// If axis has 0 steps the direction setting can be omitted
-		// If axis has 0 steps enabling motors is req'd to support power mode = 1
+		//**** setup the new segment ****
 
-		// setup motor 1
-		// the if() either sets the accumulation value or zeroes the counter
-		if ((st_run.m[MOTOR_1].phase_increment = st_prep.m[MOTOR_1].phase_increment) != 0) {
-			if (st_prep.reset_flag == true) {				// compensate for pulse phasing
-				st_run.m[MOTOR_1].phase_accumulator = -(st_run.dda_ticks_downcount);
+		st_run.dda_ticks_downcount = st_pre.dda_ticks;
+		st_run.dda_ticks_X_substeps = st_pre.dda_ticks_X_substeps;
+		TIMER_DDA.PER = st_pre.dda_period;
+
+		//**** MOTOR_1 LOAD ****
+
+		// These sections are somewhat optimized for execution speed. The whole load operation
+		// is supposed to take < 10 uSec (Xmega). Be careful if you mess with this.
+
+		// if() either sets the substep increment value or zeroes it
+
+		if ((st_run.mot[MOTOR_1].substep_increment = st_pre.mot[MOTOR_1].substep_increment) != 0) {
+
+			// Set the direction bit in hardware
+			// Compensate for direction change in the accumulator
+		 	// NB: If motor has 0 steps this is all skipped
+			if (st_pre.mot[MOTOR_1].direction_change == true) {
+				if (st_pre.mot[MOTOR_1].direction == DIRECTION_CW) 		// CW motion (bit cleared)
+					PORT_MOTOR_1_VPORT.OUT &= ~DIRECTION_BIT_bm; else 
+					PORT_MOTOR_1_VPORT.OUT |= DIRECTION_BIT_bm;			// CCW motion
+				st_run.mot[MOTOR_1].substep_accumulator = -(st_run.dda_ticks_X_substeps + st_run.mot[MOTOR_1].substep_accumulator);
 			}
-			if (st_prep.m[MOTOR_1].dir == 0) {
-				PORT_MOTOR_1_VPORT.OUT &= ~DIRECTION_BIT_bm;// CW motion (bit cleared)
-			} else {
-				PORT_MOTOR_1_VPORT.OUT |= DIRECTION_BIT_bm;	// CCW motion
-			}
-			PORT_MOTOR_1_VPORT.OUT &= ~MOTOR_ENABLE_BIT_bm;	// energize motor
-			st_run.m[MOTOR_1].power_state = MOTOR_RUNNING;
-		} else {
-			if (st.m[MOTOR_1].power_mode == MOTOR_IDLE_WHEN_STOPPED) {
-				PORT_MOTOR_1_VPORT.OUT &= ~MOTOR_ENABLE_BIT_bm;	// energize motor
-				st_run.m[MOTOR_1].power_state = MOTOR_START_IDLE_TIMEOUT;
+			// Enable the stepper and start motor power management
+			PORT_MOTOR_1_VPORT.OUT &= ~MOTOR_ENABLE_BIT_bm;				// energize motor
+			st_run.mot[MOTOR_1].power_state = MOTOR_RUNNING;			// set power management state
+			en.en[MOTOR_1].step_sign = st_pre.mot[MOTOR_1].step_sign;	// transfer in the signed step increment
+
+		} else {  // Motor has 0 steps; might need to energize motor for power mode processing
+			if (st_cfg.mot[MOTOR_1].power_mode == MOTOR_IDLE_WHEN_STOPPED) {
+				PORT_MOTOR_1_VPORT.OUT &= ~MOTOR_ENABLE_BIT_bm;			// energize motor
+				st_run.mot[MOTOR_1].power_state = MOTOR_START_IDLE_TIMEOUT;
 			}
 		}
+		// accumulate counted steps to the step position and zero out counted steps for the segment currently being loaded
+		en.en[MOTOR_1].encoder_steps += en.en[MOTOR_1].steps_run;// NB: steps_run can be + or - value
+		en.en[MOTOR_1].steps_run = 0;
 
-		if ((st_run.m[MOTOR_2].phase_increment = st_prep.m[MOTOR_2].phase_increment) != 0) {
-			if (st_prep.reset_flag == true) {
-				st_run.m[MOTOR_2].phase_accumulator = -(st_run.dda_ticks_downcount);
-			}
-			if (st_prep.m[MOTOR_2].dir == 0) {
-				PORT_MOTOR_2_VPORT.OUT &= ~DIRECTION_BIT_bm;
-			} else {
-				PORT_MOTOR_2_VPORT.OUT |= DIRECTION_BIT_bm;
+		//**** MOTOR_2 LOAD ****
+
+		if ((st_run.mot[MOTOR_2].substep_increment = st_pre.mot[MOTOR_2].substep_increment) != 0) {
+			if (st_pre.mot[MOTOR_2].direction_change == true) {
+				if (st_pre.mot[MOTOR_2].direction == DIRECTION_CW)
+					PORT_MOTOR_2_VPORT.OUT &= ~DIRECTION_BIT_bm; else
+					PORT_MOTOR_2_VPORT.OUT |= DIRECTION_BIT_bm; 
+				st_run.mot[MOTOR_2].substep_accumulator = -(st_run.dda_ticks_X_substeps + st_run.mot[MOTOR_2].substep_accumulator);
 			}
 			PORT_MOTOR_2_VPORT.OUT &= ~MOTOR_ENABLE_BIT_bm;
-			st_run.m[MOTOR_2].power_state = MOTOR_RUNNING;
+			st_run.mot[MOTOR_2].power_state = MOTOR_RUNNING;
+			en.en[MOTOR_2].step_sign = st_pre.mot[MOTOR_2].step_sign;
 		} else {
-			if (st.m[MOTOR_2].power_mode == MOTOR_IDLE_WHEN_STOPPED) {
+			if (st_cfg.mot[MOTOR_2].power_mode == MOTOR_IDLE_WHEN_STOPPED) {
 				PORT_MOTOR_2_VPORT.OUT &= ~MOTOR_ENABLE_BIT_bm;
-				st_run.m[MOTOR_2].power_state = MOTOR_START_IDLE_TIMEOUT;
+				st_run.mot[MOTOR_2].power_state = MOTOR_START_IDLE_TIMEOUT;
 			}
 		}
+		en.en[MOTOR_2].encoder_steps += en.en[MOTOR_2].steps_run;
+		en.en[MOTOR_2].steps_run = 0;
 
-		if ((st_run.m[MOTOR_3].phase_increment = st_prep.m[MOTOR_3].phase_increment) != 0) {
-			if (st_prep.reset_flag == true) {
-				st_run.m[MOTOR_3].phase_accumulator = -(st_run.dda_ticks_downcount);
-			}
-			if (st_prep.m[MOTOR_3].dir == 0) {
-				PORT_MOTOR_3_VPORT.OUT &= ~DIRECTION_BIT_bm;
-			} else {
-				PORT_MOTOR_3_VPORT.OUT |= DIRECTION_BIT_bm;
+		//**** MOTOR_3 LOAD ****
+
+		if ((st_run.mot[MOTOR_3].substep_increment = st_pre.mot[MOTOR_3].substep_increment) != 0) {
+			if (st_pre.mot[MOTOR_3].direction_change == true) {
+				if (st_pre.mot[MOTOR_3].direction == DIRECTION_CW)
+					PORT_MOTOR_3_VPORT.OUT &= ~DIRECTION_BIT_bm; else 
+					PORT_MOTOR_3_VPORT.OUT |= DIRECTION_BIT_bm;
+				st_run.mot[MOTOR_3].substep_accumulator = -(st_run.dda_ticks_X_substeps + st_run.mot[MOTOR_3].substep_accumulator);
 			}
 			PORT_MOTOR_3_VPORT.OUT &= ~MOTOR_ENABLE_BIT_bm;
-			st_run.m[MOTOR_3].power_state = MOTOR_RUNNING;
+			st_run.mot[MOTOR_3].power_state = MOTOR_RUNNING;
+			en.en[MOTOR_3].step_sign = st_pre.mot[MOTOR_3].step_sign;
 		} else {
-			if (st.m[MOTOR_3].power_mode == MOTOR_IDLE_WHEN_STOPPED) {
+			if (st_cfg.mot[MOTOR_3].power_mode == MOTOR_IDLE_WHEN_STOPPED) {
 				PORT_MOTOR_3_VPORT.OUT &= ~MOTOR_ENABLE_BIT_bm;
-				st_run.m[MOTOR_3].power_state = MOTOR_START_IDLE_TIMEOUT;
+				st_run.mot[MOTOR_3].power_state = MOTOR_START_IDLE_TIMEOUT;
 			}
 		}
+		en.en[MOTOR_3].encoder_steps += en.en[MOTOR_3].steps_run;
+		en.en[MOTOR_3].steps_run = 0;
 
-		if ((st_run.m[MOTOR_4].phase_increment = st_prep.m[MOTOR_4].phase_increment) != 0) {
-			if (st_prep.reset_flag == true) {
-				st_run.m[MOTOR_4].phase_accumulator = (st_run.dda_ticks_downcount);
-			}
-			if (st_prep.m[MOTOR_4].dir == 0) {
-				PORT_MOTOR_4_VPORT.OUT &= ~DIRECTION_BIT_bm;
-			} else {
-				PORT_MOTOR_4_VPORT.OUT |= DIRECTION_BIT_bm;
+		//**** MOTOR_4 LOAD ****
+
+		if ((st_run.mot[MOTOR_4].substep_increment = st_pre.mot[MOTOR_4].substep_increment) != 0) {
+			if (st_pre.mot[MOTOR_4].direction_change == true) {
+				if (st_pre.mot[MOTOR_4].direction == DIRECTION_CW)
+					PORT_MOTOR_4_VPORT.OUT &= ~DIRECTION_BIT_bm; else
+					PORT_MOTOR_4_VPORT.OUT |= DIRECTION_BIT_bm;
+				st_run.mot[MOTOR_4].substep_accumulator = -(st_run.dda_ticks_X_substeps + st_run.mot[MOTOR_4].substep_accumulator);
 			}
 			PORT_MOTOR_4_VPORT.OUT &= ~MOTOR_ENABLE_BIT_bm;
-			st_run.m[MOTOR_4].power_state = MOTOR_RUNNING;
+			st_run.mot[MOTOR_4].power_state = MOTOR_RUNNING;
+			en.en[MOTOR_4].step_sign = st_pre.mot[MOTOR_4].step_sign;
 		} else {
-			if (st.m[MOTOR_4].power_mode == MOTOR_IDLE_WHEN_STOPPED) {
+			if (st_cfg.mot[MOTOR_4].power_mode == MOTOR_IDLE_WHEN_STOPPED) {
 				PORT_MOTOR_4_VPORT.OUT &= ~MOTOR_ENABLE_BIT_bm;
-				st_run.m[MOTOR_4].power_state = MOTOR_START_IDLE_TIMEOUT;
+				st_run.mot[MOTOR_4].power_state = MOTOR_START_IDLE_TIMEOUT;
 			}
 		}
+		en.en[MOTOR_4].encoder_steps += en.en[MOTOR_4].steps_run;
+		en.en[MOTOR_4].steps_run = 0;
+
+		//**** do this last ****
+
 		TIMER_DDA.CTRLA = STEP_TIMER_ENABLE;				// enable the DDA timer
 
 	// handle dwells
-	} else if (st_prep.move_type == MOVE_TYPE_DWELL) {
-		st_run.dda_ticks_downcount = st_prep.dda_ticks;
-		TIMER_DWELL.PER = st_prep.dda_period;				// load dwell timer period
+	} else if (st_pre.move_type == MOVE_TYPE_DWELL) {
+		st_run.dda_ticks_downcount = st_pre.dda_ticks;
+		TIMER_DWELL.PER = st_pre.dda_period;				// load dwell timer period
  		TIMER_DWELL.CTRLA = STEP_TIMER_ENABLE;				// enable the dwell timer
 	}
 
 	// all other cases drop to here (e.g. Null moves after Mcodes skip to here) 
-	st_prep.exec_state = PREP_BUFFER_OWNED_BY_EXEC;			// flip it back
+	st_pre.exec_state = PREP_BUFFER_OWNED_BY_EXEC;			// flip it back
 	st_request_exec_move();									// exec and prep next move
-}
-
-/* 
- * st_prep_null() - Keeps the loader happy. Otherwise performs no action
- *
- *	Used by M codes, tool and spindle changes
- */
-
-void st_prep_null()
-{
-	st_prep.move_type = MOVE_TYPE_NULL;
-}
-
-/* 
- * st_prep_dwell() 	 - Add a dwell to the move buffer
- */
-
-void st_prep_dwell(float microseconds)
-{
-	st_prep.move_type = MOVE_TYPE_DWELL;
-	st_prep.dda_period = _f_to_period(FREQUENCY_DWELL);
-	st_prep.dda_ticks = (uint32_t)((microseconds/1000000) * FREQUENCY_DWELL);
 }
 
 /***********************************************************************************
@@ -496,35 +558,77 @@ void st_prep_dwell(float microseconds)
  */
 
 stat_t st_prep_line(float steps[], float microseconds)
+//stat_t st_prep_line(float steps[], float microseconds, float encoder_error[])
 {
-	// *** defensive programming ***
 	// trap conditions that would prevent queueing the line
-	if (st_prep.exec_state != PREP_BUFFER_OWNED_BY_EXEC) { return (STAT_INTERNAL_ERROR);
-	} else if (isfinite(microseconds) == false) { return (STAT_INPUT_EXCEEDS_MAX_LENGTH);
-	} else if (microseconds < EPSILON) { return (STAT_MINIMUM_TIME_MOVE_ERROR);
+	if (st_pre.exec_state != PREP_BUFFER_OWNED_BY_EXEC) { return (STAT_INTERNAL_ERROR);
+//		} else if (isinf(microseconds)) { return (cm_hard_alarm(STAT_PREP_LINE_MOVE_TIME_IS_INFINITE));
+//		} else if (isnan(microseconds)) { return (cm_hard_alarm(STAT_PREP_LINE_MOVE_TIME_IS_NAN));
+		} else if (isinf(microseconds)) { return (STAT_PREP_LINE_MOVE_TIME_IS_INFINITE);
+		} else if (isnan(microseconds)) { return (STAT_PREP_LINE_MOVE_TIME_IS_NAN);
+		} else if (microseconds < EPSILON) { return (STAT_MINIMUM_TIME_MOVE_ERROR);
 	}
-	st_prep.reset_flag = false;		// initialize accumulator reset flag for this move.
+	// setup segment parameters
+	// - dda_ticks is the integer number of DDA clock ticks needed to play out the segment
+	// - ticks_X_substeps is the maximum depth of the DDA accumulator (as a negative number)
+
+	st_pre.dda_period = _f_to_period(FREQUENCY_DDA);
+	st_pre.dda_ticks = (int32_t)((microseconds / 1000000) * FREQUENCY_DDA);
+	st_pre.dda_ticks_X_substeps = st_pre.dda_ticks * DDA_SUBSTEPS;
 
 	// setup motor parameters
+
+	uint8_t previous_direction;
 	for (uint8_t i=0; i<MOTORS; i++) {
-		st_prep.m[i].dir = ((steps[i] < 0) ? 1 : 0) ^ st.m[i].polarity;
-		st_prep.m[i].phase_increment = (uint32_t)fabs(steps[i] * DDA_SUBSTEPS);
-	}
-	st_prep.dda_period = _f_to_period(FREQUENCY_DDA);
-	st_prep.dda_ticks = (uint32_t)((microseconds/1000000) * FREQUENCY_DDA);
-	st_prep.dda_ticks_X_substeps = st_prep.dda_ticks * DDA_SUBSTEPS;
 
-	// FOOTNOTE: The above expression was previously computed as below but floating
-	// point rounding errors caused subtle and nasty accumulated position errors:
-	// sp.dda_ticks_X_substeps = (uint32_t)((microseconds/1000000) * f_dda * dda_substeps);
+		// Skip this motor if there are no new steps. Leave all values intact.
+		if (fp_ZERO(steps[i])) { st_pre.mot[i].substep_increment = 0; continue;}
 
-	// anti-stall measure in case change in velocity between segments is too great 
-	if ((st_prep.dda_ticks * ACCUMULATOR_RESET_FACTOR) < st_prep.prev_ticks) {  // NB: uint32_t math
-		st_prep.reset_flag = true;
+		// Direction - set the direction, compensating for polarity.
+		// Set the step_sign which is used by the stepper IRQ to accumulate step position
+		// Detect direction changes. Needed for accumulator adjustment
+
+		previous_direction = st_pre.mot[i].direction;
+		if (steps[i] >= 0) {					// positive direction
+			st_pre.mot[i].direction = DIRECTION_CW ^ st_cfg.mot[i].polarity;
+			st_pre.mot[i].step_sign = 1;
+			} else {
+			st_pre.mot[i].direction = DIRECTION_CCW ^ st_cfg.mot[i].polarity;
+			st_pre.mot[i].step_sign = -1;
+		}
+		st_pre.mot[i].direction_change = st_pre.mot[i].direction ^ previous_direction;
+
+		// Compute substeb increment. The accumulator must be *exactly* the incoming
+		// fractional steps times the substep multipler or positional drift will occur.
+		// Rounding is performed to eliminate a negative bias in the int32 conversion
+		// that results in long-term negative drift. (fabs/round order doesn't matter)
+
+		st_pre.mot[i].substep_increment = round(fabs(steps[i] * DDA_SUBSTEPS));
 	}
-	st_prep.prev_ticks = st_prep.dda_ticks;
-	st_prep.move_type = MOVE_TYPE_ALINE;
+	st_pre.move_type = MOVE_TYPE_ALINE;
 	return (STAT_OK);
+}
+
+/* 
+ * st_prep_null() - Keeps the loader happy. Otherwise performs no action
+ *
+ *	Used by M codes, tool and spindle changes
+ */
+
+void st_prep_null()
+{
+	st_pre.move_type = MOVE_TYPE_NULL;
+}
+
+/* 
+ * st_prep_dwell() 	 - Add a dwell to the move buffer
+ */
+
+void st_prep_dwell(float microseconds)
+{
+	st_pre.move_type = MOVE_TYPE_DWELL;
+	st_pre.dda_period = _f_to_period(FREQUENCY_DWELL);
+	st_pre.dda_ticks = (uint32_t)((microseconds/1000000) * FREQUENCY_DWELL);
 }
 
 /*
@@ -593,8 +697,11 @@ static int8_t _get_motor(const index_t index)
 
 static void _set_motor_steps_per_unit(cmdObj_t *cmd) 
 {
+//	uint8_t m = _get_motor(cmd->index);
+//	st_cfg.mot[m].steps_per_unit = (360 / (st_cfg.mot[m].step_angle / st_cfg.mot[m].microsteps) / st_cfg.mot[m].travel_rev);
 	uint8_t m = _get_motor(cmd->index);
-	st.m[m].steps_per_unit = (360 / (st.m[m].step_angle / st.m[m].microsteps) / st.m[m].travel_rev);
+	st_cfg.mot[m].units_per_step = (st_cfg.mot[m].travel_rev * st_cfg.mot[m].step_angle) / (360 * st_cfg.mot[m].microsteps);
+	st_cfg.mot[m].steps_per_unit = 1 / st_cfg.mot[m].units_per_step;
 }
 
 stat_t st_set_sa(cmdObj_t *cmd)			// motor step angle
@@ -635,7 +742,7 @@ stat_t st_set_pm(cmdObj_t *cmd)			// motor power mode
 
 stat_t st_set_mt(cmdObj_t *cmd)
 {
-	st.motor_idle_timeout = min(IDLE_TIMEOUT_SECONDS_MAX, max(cmd->value, IDLE_TIMEOUT_SECONDS_MIN));
+	st_cfg.motor_idle_timeout = min(IDLE_TIMEOUT_SECONDS_MAX, max(cmd->value, IDLE_TIMEOUT_SECONDS_MIN));
 	return (STAT_OK);
 }
 
@@ -674,7 +781,7 @@ stat_t st_set_mp(cmdObj_t *cmd)	// motor power level
 	set_flt(cmd);				// set the value in the motor config struct (st)
 	
 	uint8_t motor = _get_motor(cmd->index);
-	st_run.m[motor].power_level = cmd->value;
+	st_run.mot[motor].power_level = cmd->value;
 	_set_motor_power_level(motor, cmd->value);
 	return(STAT_OK);
 }
