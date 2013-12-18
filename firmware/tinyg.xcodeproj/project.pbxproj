@@ -189,6 +189,9 @@
 		204C302E183D4B970058D2F2 /* xmega_rtc.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = xmega_rtc.c; sourceTree = "<group>"; };
 		204C302F183D4B970058D2F2 /* xmega_rtc.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = xmega_rtc.h; sourceTree = "<group>"; };
 		204C3030183D4B970058D2F2 /* xmega_wdt.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = xmega_wdt.c; sourceTree = "<group>"; };
+		20BCDE8318622E4C0081AE10 /* encoder.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = encoder.c; sourceTree = "<group>"; };
+		20BCDE8418622E4C0081AE10 /* encoder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = encoder.h; sourceTree = "<group>"; };
+		20BCDE8518622E4C0081AE10 /* plan_exec.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = plan_exec.c; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -232,6 +235,7 @@
 				204C2FDA183D4B970058D2F2 /* main.c */,
 				204C2FDB183D4B970058D2F2 /* network.c */,
 				204C2FDC183D4B970058D2F2 /* network.h */,
+				20BCDE8518622E4C0081AE10 /* plan_exec.c */,
 				204C2FDD183D4B970058D2F2 /* plan_arc.c */,
 				204C2FDE183D4B970058D2F2 /* plan_arc.h */,
 				204C2FDF183D4B970058D2F2 /* plan_line.c */,
@@ -245,6 +249,8 @@
 				204C2FF6183D4B970058D2F2 /* settings.h */,
 				204C2FF7183D4B970058D2F2 /* spindle.c */,
 				204C2FF8183D4B970058D2F2 /* spindle.h */,
+				20BCDE8318622E4C0081AE10 /* encoder.c */,
+				20BCDE8418622E4C0081AE10 /* encoder.h */,
 				204C2FF9183D4B970058D2F2 /* stepper.c */,
 				204C2FFA183D4B970058D2F2 /* stepper.h */,
 				204C2FFB183D4B970058D2F2 /* switch.c */,
