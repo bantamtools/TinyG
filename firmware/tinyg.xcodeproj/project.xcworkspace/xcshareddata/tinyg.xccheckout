@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>IDESourceControlProjectFavoriteDictionaryKey</key>
+	<false/>
+	<key>IDESourceControlProjectIdentifier</key>
+	<string>7C1428FF-015E-46E2-A3A6-6D5B48F26B2E</string>
+	<key>IDESourceControlProjectName</key>
+	<string>tinyg</string>
+	<key>IDESourceControlProjectOriginsDictionary</key>
+	<dict>
+		<key>0EF7FAAE-AC8F-4D12-94BA-7D4A2253D0C3</key>
+		<string>https://github.com/omco/TinyG.git</string>
+	</dict>
+	<key>IDESourceControlProjectPath</key>
+	<string>firmware/tinyg.xcodeproj/project.xcworkspace</string>
+	<key>IDESourceControlProjectRelativeInstallPathDictionary</key>
+	<dict>
+		<key>0EF7FAAE-AC8F-4D12-94BA-7D4A2253D0C3</key>
+		<string>../../..</string>
+	</dict>
+	<key>IDESourceControlProjectURL</key>
+	<string>https://github.com/omco/TinyG.git</string>
+	<key>IDESourceControlProjectVersion</key>
+	<integer>110</integer>
+	<key>IDESourceControlProjectWCCIdentifier</key>
+	<string>0EF7FAAE-AC8F-4D12-94BA-7D4A2253D0C3</string>
+	<key>IDESourceControlProjectWCConfigurations</key>
+	<array>
+		<dict>
+			<key>IDESourceControlRepositoryExtensionIdentifierKey</key>
+			<string>public.vcs.git</string>
+			<key>IDESourceControlWCCIdentifierKey</key>
+			<string>0EF7FAAE-AC8F-4D12-94BA-7D4A2253D0C3</string>
+			<key>IDESourceControlWCCName</key>
+			<string>TinyG</string>
+		</dict>
+	</array>
+</dict>
+</plist>
