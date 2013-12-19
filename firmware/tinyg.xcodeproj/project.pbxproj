@@ -457,12 +457,13 @@
 			files = (
 			);
 			inputPaths = (
+				"",
 			);
 			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "";
+			shellScript = "avrdude -p x192a3 -c avrisp2 -b 115200 -P usb -U flash:w:./tinyg/default/tinyg.hex";
 		};
 /* End PBXShellScriptBuildPhase section */
 

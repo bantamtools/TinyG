@@ -51,7 +51,7 @@
 // *** settings.h overrides ***
 // Note: there are some commented test values below
 
-#undef SR_DEFAULTS
+#undef  SR_DEFAULTS
 #define SR_DEFAULTS 			"mpox","mpoy","mpoz","mpoa","ofsx","ofsy","ofsz","ofsa","unit","stat","coor","momo","dist","home","hold","macs","cycs","mots","plan"
 
 #undef	SWITCH_TYPE
@@ -79,7 +79,7 @@
 #define COM_ENABLE_FLOW_CONTROL		FLOW_CONTROL_XON
 
 #undef GCODE_DEFAULT_COORD_SYSTEM
-#undef GCODE_DEFAULT_UNITS
+#undef GCODE_DEFAULT_UNITS 
 #undef GCODE_DEFAULT_PLANE
 #undef GCODE_DEFAULT_COORD_SYSTEM
 #undef GCODE_DEFAULT_PATH_CONTROL

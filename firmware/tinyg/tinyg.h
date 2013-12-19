@@ -44,7 +44,7 @@
 
 /****** REVISIONS ******/
 
-//#define TINYG_FIRMWARE_BUILD   		397.22	// added user data groups
+//#define TINYG_FIRMWARE_BUILD   		397.27	// had to change homing to allow for 0 value max (and negative min)
 #define TINYG_FIRMWARE_VERSION		0.97	// firmware major version
 #define TINYG_HARDWARE_PLATFORM		1		// hardware platform indicator (1 = Xmega series)
 #define TINYG_HARDWARE_VERSION		8		// hardware platform revision number (defaults to)
@@ -52,15 +52,15 @@
 
 /****** COMPILE-TIME SETTINGS ******/
 
-//#define __ORIG_CORRECTION_CODE
+#define __ORIG_CORRECTION_CODE
 #define __JERK_EXEC		// comment to use forward difference based exec vs jerk computed exec
 //#define __SIMULATION	// shorthand to keep from having to comment and uncomment the below:
 
 #ifndef __SIMULATION
-//  #define __TEXT_MODE						// comment out to disable text mode support (saves ~9Kb)
-//  #define __HELP_SCREENS					// comment out to disable help screens 		(saves ~3.5Kb)
-//  #define __CANNED_TESTS 					// comment out to remove $tests 			(saves ~12Kb)
-//  #define __TEST_99 						// comment out to remove diagnostic test 99
+  #define __TEXT_MODE						// comment out to disable text mode support (saves ~9Kb)
+  #define __HELP_SCREENS					// comment out to disable help screens 		(saves ~3.5Kb)
+  #define __CANNED_TESTS 					// comment out to remove $tests 			(saves ~12Kb)
+  #define __TEST_99 						// comment out to remove diagnostic test 99
 #endif
 
 /****** DEVELOPMENT SETTINGS ******/

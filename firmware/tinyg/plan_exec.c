@@ -446,9 +446,9 @@ static stat_t _exec_aline_tail()
  */
 static stat_t _exec_aline_segment(uint8_t correction_flag)
 {
+	uint8_t i;
 	float travel[AXES];
 	float steps[MOTORS];
-	uint8_t i;
 
 #ifdef __ORIG_CORRECTION_CODE
 
@@ -457,14 +457,14 @@ static stat_t _exec_aline_segment(uint8_t correction_flag)
 	// Don't do the endpoint correction if you are going into a hold
 	if ((correction_flag == true) && (mr.segment_count == 1) && 
 		(cm.motion_state == MOTION_RUN) && (cm.cycle_state == CYCLE_MACHINING)) {
-		printf("m[2]:%0.4f, %0.4f\n", (double)mr.gm.target[AXIS_Z], (double)mr.target[AXIS_Z]);	// +++++ DIAGNOSTIC
+//		printf("m[2]:%0.4f, %0.4f\n", (double)mr.gm.target[AXIS_Z], (double)mr.target[AXIS_Z]);	// +++++ DIAGNOSTIC
 		for (i=0; i<AXES; i++) {
 			mr.gm.target[i] = mr.target[i]; // correct any accumulated rounding errors in last segment
 		}
 	} else {
-		float intermediate = mr.segment_velocity * mr.segment_time;
+		float segment_length = mr.segment_velocity * mr.segment_time;
 		for (i=0; i<AXES; i++) {
-			mr.gm.target[i] = mr.position[i] + (mr.unit[i] * intermediate);
+			mr.gm.target[i] = mr.position[i] + (mr.unit[i] * segment_length);
 		}
 	}
 #else // new error correction
@@ -476,9 +476,9 @@ static stat_t _exec_aline_segment(uint8_t correction_flag)
 	if ((end_flag == true) && (mr.segment_count == 1) && 
 		(cm.motion_state == MOTION_RUN) && (cm.cycle_state == CYCLE_MACHINING)) {
 
-		printf("M[0]:%0.4f, %0.4f\n", (double)mr.gm.target[AXIS_X], (double)mr.target[AXIS_X]);	// +++++ DIAGNOSTIC
-		printf("M[1]:%0.4f, %0.4f\n", (double)mr.gm.target[AXIS_Y], (double)mr.target[AXIS_Y]);	// +++++ DIAGNOSTIC
-		printf("M[2]:%0.4f, %0.4f\n", (double)mr.gm.target[AXIS_Z], (double)mr.target[AXIS_Z]);	// +++++ DIAGNOSTIC
+//		printf("M[0]:%0.4f, %0.4f\n", (double)mr.gm.target[AXIS_X], (double)mr.target[AXIS_X]);	// +++++ DIAGNOSTIC
+//		printf("M[1]:%0.4f, %0.4f\n", (double)mr.gm.target[AXIS_Y], (double)mr.target[AXIS_Y]);	// +++++ DIAGNOSTIC
+//		printf("M[2]:%0.4f, %0.4f\n", (double)mr.gm.target[AXIS_Z], (double)mr.target[AXIS_Z]);	// +++++ DIAGNOSTIC
 
 		// A positive correction means that distance will be added to the subsequent moves,
 		// looked at another way, that the target fell short of the endpoint. Neg is opposite.
@@ -497,7 +497,7 @@ static stat_t _exec_aline_segment(uint8_t correction_flag)
 			mr.gm.target[i] += min(mr.position_correction[i], MAX_CORRECTION_MM);
 			mr.position_correction[i] -= min(mr.position_correction[i], MAX_CORRECTION_MM);
 //			if (i == AXIS_Z) {
-				printf("C[%d]:%0.4f, %0.4f\n", i, (double)mr.gm.target[AXIS_Z], (double)mr.position_correction[AXIS_Z]);	// +++++ DIAGNOSTIC
+//				printf("C[%d]:%0.4f, %0.4f\n", i, (double)mr.gm.target[AXIS_Z], (double)mr.position_correction[AXIS_Z]);	// +++++ DIAGNOSTIC
 //			}			
 		}
 	}
