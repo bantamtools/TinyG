@@ -69,9 +69,7 @@ static void _request_load_move(void);
 void stepper_init()
 {
 	memset(&st_run, 0, sizeof(st_run));			// clear all values, pointers and status
-//	stepper_init_assertions();
-	st_run.magic_start = MAGICNUM;
-	st_pre.magic_start = MAGICNUM;
+	stepper_init_assertions();
 
 	// Configure virtual ports
 	PORTCFG.VPCTRLA = PORTCFG_VP0MAP_PORT_MOTOR_1_gc | PORTCFG_VP1MAP_PORT_MOTOR_2_gc;
@@ -109,12 +107,24 @@ void stepper_init()
 }
 
 /*
- * st_assertions() - test assertions, return error code if violation exists
+ * stepper_init_assertions() - test assertions, return error code if violation exists
+ * stepper_test_assertions() - test assertions, return error code if violation exists
  */
-stat_t st_assertions()
+
+void stepper_init_assertions()
 {
-	if (st_run.magic_start  != MAGICNUM) return (STAT_MEMORY_FAULT);
-	if (st_pre.magic_start != MAGICNUM) return (STAT_MEMORY_FAULT);
+	st_run.magic_end = MAGICNUM;
+	st_run.magic_start = MAGICNUM;
+	st_pre.magic_end = MAGICNUM;
+	st_pre.magic_start = MAGICNUM;
+}
+
+stat_t stepper_test_assertions()
+{
+	if (st_run.magic_end	!= MAGICNUM) return (STAT_STEPPER_ASSERTION_FAILURE);
+	if (st_run.magic_start	!= MAGICNUM) return (STAT_STEPPER_ASSERTION_FAILURE);
+	if (st_pre.magic_end	!= MAGICNUM) return (STAT_STEPPER_ASSERTION_FAILURE);
+	if (st_pre.magic_start	!= MAGICNUM) return (STAT_STEPPER_ASSERTION_FAILURE);
 	return (STAT_OK);
 }
 
@@ -131,11 +141,8 @@ uint8_t stepper_isbusy()
 
 /*
  * st_reset() - reset stepper internals
- * st_cycle_start() - Initializes values for beginning a new cycle.
+ * st_cycle_start() - Initializes values for beginning a new cycle (called from cm_cycle_start())
  * st_cycle_end()
- * st_clc()
- *
- * st_cycle_start() is called from cm_cycle_start().  
  */
 
 void st_reset()
@@ -161,12 +168,6 @@ void st_cycle_start(void)
 void st_cycle_end(void)
 {
 	mp_print_motor_positions();
-}
-
-stat_t st_clc(cmdObj_t *cmd)	// clear diagnostic counters, reset stepper prep
-{
-	st_cycle_end();
-	return(STAT_OK);
 }
 
 /*
@@ -286,32 +287,6 @@ stat_t st_motor_power_callback() 	// called by controller
  */
 
 ISR(TIMER_DDA_ISR_vect)
-/*{
-	if ((st_run.mot[MOTOR_1].substep_accumulator += st_run.mot[MOTOR_1].substep_increment) > 0) {
-		PORT_MOTOR_1_VPORT.OUT |= STEP_BIT_bm;		// turn step bit on
- 		st_run.mot[MOTOR_1].substep_accumulator -= st_run.dda_ticks_X_substeps;
-		PORT_MOTOR_1_VPORT.OUT &= ~STEP_BIT_bm;		// turn step bit off in ~1 uSec
-	}
-	if ((st_run.mot[MOTOR_2].substep_accumulator += st_run.mot[MOTOR_2].substep_increment) > 0) {
-		PORT_MOTOR_2_VPORT.OUT |= STEP_BIT_bm;
- 		st_run.mot[MOTOR_2].substep_accumulator -= st_run.dda_ticks_X_substeps;
-		PORT_MOTOR_2_VPORT.OUT &= ~STEP_BIT_bm;
-	}
-	if ((st_run.mot[MOTOR_3].substep_accumulator += st_run.mot[MOTOR_3].substep_increment) > 0) {
-		PORT_MOTOR_3_VPORT.OUT |= STEP_BIT_bm;
- 		st_run.mot[MOTOR_3].substep_accumulator -= st_run.dda_ticks_X_substeps;
-		PORT_MOTOR_3_VPORT.OUT &= ~STEP_BIT_bm;
-	}
-	if ((st_run.mot[MOTOR_4].substep_accumulator += st_run.mot[MOTOR_4].substep_increment) > 0) {
-		PORT_MOTOR_4_VPORT.OUT |= STEP_BIT_bm;
- 		st_run.mot[MOTOR_4].substep_accumulator -= st_run.dda_ticks_X_substeps;
-		PORT_MOTOR_4_VPORT.OUT &= ~STEP_BIT_bm;
-	}
-	if (--st_run.dda_ticks_downcount == 0) {			// end move
-		TIMER_DDA.CTRLA = STEP_TIMER_DISABLE;			// disable DDA timer
-		_load_move();									// load the next move
-	}
-}*/
 {
 	if ((st_run.mot[MOTOR_1].substep_accumulator += st_run.mot[MOTOR_1].substep_increment) > 0) {
 		PORT_MOTOR_1_VPORT.OUT |= STEP_BIT_bm;		// turn step bit on
@@ -681,7 +656,7 @@ static int8_t _get_motor(const index_t index)
 {
 	char_t *ptr;
 	char_t motors[] = {"123456"};
-	char_t tmp[CMD_TOKEN_LEN+1];
+	char_t tmp[TOKEN_LEN+1];
 
 	strcpy_P(tmp, cfgArray[index].group);
 	if ((ptr = strchr(motors, tmp[0])) == NULL) {

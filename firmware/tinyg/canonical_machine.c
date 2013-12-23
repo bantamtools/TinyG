@@ -154,6 +154,8 @@ uint8_t cm_get_combined_state()
 		if (cm.motion_state == MOTION_RUN) cm.combined_state = COMBINED_RUN;
 		if (cm.motion_state == MOTION_HOLD) cm.combined_state = COMBINED_HOLD;
 	}
+	if (cm.machine_state == MACHINE_SHUTDOWN) { cm.combined_state = COMBINED_SHUTDOWN;}
+
 	return cm.combined_state;
 }
 
@@ -381,7 +383,7 @@ void cm_set_model_target(float target[], float flag[])
 }
 
 /* 
- * cm_conditional_set_model_position() - set endpoint position; uses internal canonical coordinates only
+ * cm_set_model_position() - set endpoint position; uses internal canonical coordinates only
  *
  * 	This routine sets the endpoint position in the gccode model if the move was 
  *	successfully completed (no errors). Leaving the endpoint position alone for 
@@ -392,8 +394,7 @@ void cm_set_model_target(float target[], float flag[])
  *	the planner(s) and steppers will still be processing the action and the real tool 
  *	position is still close to the starting point. 
  */
-
-void cm_conditional_set_model_position(stat_t status) 
+void cm_set_model_position(stat_t status) 
 {
 	if (status == STAT_OK) copy_axis_vector(cm.gmx.position, cm.gm.target);
 }
@@ -458,7 +459,7 @@ void cm_conditional_set_model_position(stat_t status)
  *		any time required for acceleration or deceleration.
  */
 
-#define JENNY 8675309
+#define JENNIFER 8675309
 
 void cm_set_move_times(GCodeState_t *gcode_state)
 {
@@ -467,7 +468,7 @@ void cm_set_move_times(GCodeState_t *gcode_state)
 	float abc_time=0;					// coordinated move rotary part at req feed rate
 	float max_time=0;					// time required for the rate-limiting axis
 	float tmp_time=0;					// used in computation
-	gcode_state->minimum_time = JENNY; 	// arbitrarily large number
+	gcode_state->minimum_time = JENNIFER;// arbitrarily large number
 
 	// NOTE: In the below code all references to 'cm.gm.' read from the canonical machine gm, 
 	//		 not the target gcode model, which is referenced as target_gm->  In most cases 
@@ -503,16 +504,27 @@ void cm_set_move_times(GCodeState_t *gcode_state)
 /* 
  * cm_test_soft_limits() - return error code if soft limit is exceeded
  *
- *	Must be called with target properly set in GM struct. Best done after cm_set_model_target() 
+ *	Must be called with target properly set in GM struct. Best done after cm_set_model_target().
+ *
+ *	Tests for soft limit for any homed axis if min and max are different values. You can set min 
+ *	and max to 0,0 to disable soft limits for an axis. Also will not test a min or a max if the 
+ *	value is < -1000000 (negative one million). This allows a single end to be tested w/the other 
+ *	disabled, should that requirement ever arise.
  */
 stat_t cm_test_soft_limits(float target[])
 {
 	for (uint8_t axis = AXIS_X; axis < AXES; axis++) {
-//		if ((cm.gm.target[axis] > cm.a[axis].travel_max) ||
-//			(cm.gm.target[axis] < cm.a[axis].travel_min)) 
-		if ((target[axis] > cm.a[axis].travel_max) ||
-			(target[axis] < cm.a[axis].travel_min)) 
+		if (cm.homed[axis] != true) continue;		// don't test axes that are not homed
+
+		if (fp_EQ(cm.a[axis].travel_min, cm.a[axis].travel_max)) continue;
+
+		if ((cm.a[axis].travel_min > DISABLE_SOFT_LIMIT) && (target[axis] < cm.a[axis].travel_min)) {
 			return (STAT_SOFT_LIMIT_EXCEEDED);
+		}
+
+		if ((cm.a[axis].travel_max > DISABLE_SOFT_LIMIT) && (target[axis] > cm.a[axis].travel_max)) {
+			return (STAT_SOFT_LIMIT_EXCEEDED);
+		}
 	}
 	return (STAT_OK);
 }
@@ -537,12 +549,7 @@ void canonical_machine_init()
 	memset(&cm.gn, 0, sizeof(GCodeInput_t));
 	memset(&cm.gf, 0, sizeof(GCodeInput_t));
 
-
-	// setup magic numbers
-	cm.magic_start = MAGICNUM;
-	cm.magic_end = MAGICNUM;
-	cm.gmx.magic_start = MAGICNUM;
-	cm.gmx.magic_end = MAGICNUM;
+	canonical_machine_init_assertions();
 
 	// set gcode defaults
 	cm_set_units_mode(cm.units_mode);
@@ -573,9 +580,52 @@ void canonical_machine_init()
 }
 
 /*
- * cm_alarm() - alarm state; send an exception report and shut down machine
+ * canonical_machine_init_assertions()
+ * canonical_machine_test_assertions() - test assertions, return error code if violation exists
  */
-stat_t cm_alarm(stat_t status)
+void canonical_machine_init_assertions(void)
+{
+	cm.magic_start = MAGICNUM;
+	cm.magic_end = MAGICNUM;
+	cm.gmx.magic_start = MAGICNUM;
+	cm.gmx.magic_end = MAGICNUM;
+	arc.magic_start = MAGICNUM;
+	arc.magic_end = MAGICNUM;
+}
+
+stat_t canonical_machine_test_assertions(void)
+{
+	if ((cm.magic_start 	!= MAGICNUM) || (cm.magic_end 	  != MAGICNUM)) return (STAT_CANONICAL_MACHINE_ASSERTION_FAILURE);
+	if ((cm.gmx.magic_start != MAGICNUM) || (cm.gmx.magic_end != MAGICNUM)) return (STAT_CANONICAL_MACHINE_ASSERTION_FAILURE);
+	if ((arc.magic_start 	!= MAGICNUM) || (arc.magic_end    != MAGICNUM)) return (STAT_CANONICAL_MACHINE_ASSERTION_FAILURE);
+	return (STAT_OK);
+}
+
+/*
+ * cm_soft_alarm() - alarm state; send an exception report and stop processing input
+ * cm_hard_alarm() - alarm state; send an exception report and shut down machine
+ * cm_clear() 	   - clear soft alarm
+ *
+ *	Fascinating: http://www.cncalarms.com/
+ */
+stat_t cm_soft_alarm(stat_t status)
+{
+	rpt_exception(status);					// send alarm message
+	cm.machine_state = MACHINE_ALARM;
+	return (status);
+}
+
+stat_t cm_clear(cmdObj_t *cmd)				// clear soft alarm
+{
+	if (cm.cycle_state != CYCLE_OFF) {
+		cm.machine_state = MACHINE_CYCLE;
+	} else {
+		cm.machine_state = MACHINE_PROGRAM_STOP;
+	}
+	return (STAT_OK);
+}
+
+stat_t cm_hard_alarm(stat_t status)
 {
 	// stop the steppers and the spindle
 	st_deenergize_motors();
@@ -588,23 +638,11 @@ stat_t cm_alarm(stat_t status)
 //	gpio_set_bit_off(MIST_COOLANT_BIT);		//###### replace with exec function
 //	gpio_set_bit_off(FLOOD_COOLANT_BIT);	//###### replace with exec function
 
-	cm.machine_state = MACHINE_ALARM;
 	rpt_exception(status);					// send shutdown message
+	cm.machine_state = MACHINE_SHUTDOWN;
 	return (status);
 }
 
-/*
- * cm_assertions() - test assertions, return error code if violation exists
- */
-stat_t cm_assertions()
-{
-	if ((cm.magic_start 	!= MAGICNUM) || (cm.magic_end 	  != MAGICNUM)) return (STAT_MEMORY_FAULT);
-	if ((cm.gmx.magic_start != MAGICNUM) || (cm.gmx.magic_end != MAGICNUM)) return (STAT_MEMORY_FAULT);
-	if ((arc.magic_start 	!= MAGICNUM) || (arc.magic_end    != MAGICNUM)) return (STAT_MEMORY_FAULT);
-	if ((cfg.magic_start	!= MAGICNUM) || (cfg.magic_end 	  != MAGICNUM)) return (STAT_MEMORY_FAULT);
-	if ((cmdStr.magic_start != MAGICNUM) || (cmdStr.magic_end != MAGICNUM)) return (STAT_MEMORY_FAULT);
-	return (STAT_OK);
-}
 
 /**************************
  * Representation (4.3.3) *
@@ -817,13 +855,15 @@ stat_t cm_straight_traverse(float target[], float flags[])
 	cm.gm.motion_mode = MOTION_MODE_STRAIGHT_TRAVERSE;
 	cm_set_model_target(target,flags);
 	if (vector_equal(cm.gm.target, cm.gmx.position)) { return (STAT_OK); }
+	stat_t status = cm_test_soft_limits(cm.gm.target);
+	if (status != STAT_OK) return (cm_soft_alarm(status));
 //	ritorno(cm_test_soft_limits(cm.gm.target));
 
 	cm_set_work_offsets(&cm.gm);				// capture the fully resolved offsets to the state
 	cm_set_move_times(&cm.gm);					// set move time and minimum time in the state
 	cm_cycle_start();							// required for homing & other cycles
-	stat_t status = mp_aline(&cm.gm);			// run the move
-	cm_conditional_set_model_position(status);	// update position if the move was successful
+	status = mp_aline(&cm.gm);					// run the move
+	cm_set_model_position(status);				// update position if the move was successful
 	return (status);
 }
 
@@ -938,22 +978,17 @@ stat_t cm_straight_feed(float target[], float flags[])
 	if ((cm.gm.inverse_feed_rate_mode == false) && (fp_ZERO(cm.gm.feed_rate))) {
 		return (STAT_GCODE_FEEDRATE_ERROR);
 	}
-
-	// Introduce a short delay if the machine is not busy to enable the planning
-	// queue to begin to fill (avoids first block having to plan down to zero)
-//	if (st_isbusy() == false) {
-//		cm_dwell(PLANNER_STARTUP_DELAY_SECONDS);
-//	}
-
 	cm_set_model_target(target, flags);
 	if (vector_equal(cm.gm.target, cm.gmx.position)) { return (STAT_OK); }
+	stat_t status = cm_test_soft_limits(cm.gm.target);
+	if (status != STAT_OK) return (cm_soft_alarm(status));
 //	ritorno(cm_test_soft_limits(cm.gm.target));
 
 	cm_set_work_offsets(&cm.gm);				// capture the fully resolved offsets to the state
 	cm_set_move_times(&cm.gm);					// set move time and minimum time in the state
 	cm_cycle_start();							// required for homing & other cycles
-	stat_t status = mp_aline(&cm.gm);			// run the move
-	cm_conditional_set_model_position(status);	// update position if the move was successful
+	status = mp_aline(&cm.gm);					// run the move
+	cm_set_model_position(status);				// update position if the move was successful
 	return (status);
 }
 
@@ -1137,7 +1172,9 @@ stat_t cm_spindle_override_factor(uint8_t flag)	// M50.1
 }
 
 /*
- * cm_message() - queue a message to the response string (unconditionally)
+ * cm_message() - queue a RAM string as a message in the response (unconditionally)
+ *
+ *	Note: If you need to post a FLASH string use pstr2str to convert it to a RAM string
  */
 
 void cm_message(char_t *message)
@@ -1152,13 +1189,14 @@ void cm_message(char_t *message)
  * This group implements stop, start, end, and hold. 
  * It is extended beyond the NIST spec to handle various situations.
  *
+ *	_exec_program_finalize()
  *	cm_cycle_start()			(no Gcode)  Do a cycle start right now
  *	cm_cycle_end()				(no Gcode)	Do a cycle end right now
  *	cm_feedhold()				(no Gcode)	Initiate a feedhold right now	
  *	cm_program_stop()			(M0, M60)	Queue a program stop
  *	cm_optional_program_stop()	(M1)
  *	cm_program_end()			(M2, M30)
- *	_exec_program_finalize()
+ *	cm_machine_ready()			puts machine into a READY state
  *
  * cm_program_stop and cm_optional_program_stop are synchronous Gcode 
  * commands that are received through the interpreter. They cause all motion
@@ -1309,6 +1347,7 @@ static void _exec_program_finalize(float *value, float *flag)
 		cm_set_motion_mode(MODEL, MOTION_MODE_CANCEL_MOTION_MODE);
 	}
 
+	st_cycle_end();							// finalize steppers at end of cycle
 	sr_request_status_report(SR_IMMEDIATE_REQUEST);	// request a final status report (not unfiltered)
 	cmd_persist_offsets(cm.g10_persist_flag);		// persist offsets if any changes made
 }
@@ -1316,10 +1355,12 @@ static void _exec_program_finalize(float *value, float *flag)
 void cm_cycle_start()
 {
 	cm.machine_state = MACHINE_CYCLE;
-	if (cm.cycle_state == CYCLE_OFF) {
-		cm.cycle_state = CYCLE_MACHINING;			// don't change homing, probe or other cycles
+	if (cm.cycle_state == CYCLE_OFF) {				// don't (re)start homing, probe or other canned cycles
+		st_cycle_start();							// initialize steppers for beginning of cycle
+		cm.cycle_state = CYCLE_MACHINING;
 		qr_init_queue_report();						// clear queue reporting buffer counts
 	}
+
 }
 
 void cm_cycle_end() 
@@ -1494,12 +1535,12 @@ char_t cm_get_axis_char(const int8_t axis)
 static int8_t _get_axis(const index_t index)
 {
 	char_t *ptr;
-	char_t tmp[CMD_TOKEN_LEN+1];
+	char_t tmp[TOKEN_LEN+1];
 	char_t axes[] = {"xyzabc"};
 
-	strcpy_P(tmp, cfgArray[index].token);			// kind of a hack. Looks for an axis
-	if ((ptr = strchr(axes, tmp[0])) == NULL) { 	// character in the 0 and 3 positions
-		if ((ptr = strchr(axes, tmp[3])) == NULL) { // to accommodate 'xam' and 'g54x' styles
+	strncpy_P(tmp, cfgArray[index].token, TOKEN_LEN);	// kind of a hack. Looks for an axis
+	if ((ptr = strchr(axes, tmp[0])) == NULL) {			// character in the 0 and 3 positions
+		if ((ptr = strchr(axes, tmp[3])) == NULL) {		// to accommodate 'xam' and 'g54x' styles
 			return (-1);
 		}
 	}

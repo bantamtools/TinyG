@@ -129,7 +129,7 @@ static void _application_init(void)
  */
 
 stat_t status_code;						// allocate a variable for this macro
-char shared_buf[STATUS_MESSAGE_LEN];	// allocate string for global use
+char shared_buf[MESSAGE_LEN];			// allocate string for global use
 
 static const char stat_00[] PROGMEM = "OK";
 static const char stat_01[] PROGMEM = "Error";
@@ -208,9 +208,9 @@ static const char stat_70[] PROGMEM = "Arc specification error";
 static const char stat_71[] PROGMEM = "Soft limit exceeded";
 static const char stat_72[] PROGMEM = "Command not accepted";
 static const char stat_73[] PROGMEM = "Probing cycle failed";
-static const char stat_74[] PROGMEM = "74";
-static const char stat_75[] PROGMEM = "75";
-static const char stat_76[] PROGMEM = "76";
+static const char stat_74[] PROGMEM = "Jogging cycle failed";
+static const char stat_75[] PROGMEM = "Machine is alarmed - Command not processed";	// current longest message 43 chars (including NUL)
+static const char stat_76[] PROGMEM = "Limit switch hit - Shutdown occurred";
 static const char stat_77[] PROGMEM = "77";
 static const char stat_78[] PROGMEM = "78";
 static const char stat_79[] PROGMEM = "79";
