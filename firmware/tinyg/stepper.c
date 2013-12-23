@@ -148,8 +148,8 @@ uint8_t stepper_isbusy()
 void st_reset()
 {
 	for (uint8_t i=0; i<MOTORS; i++) {
-		st_pre.mot[MOTOR_1].direction_change = true;
-		st_run.mot[MOTOR_1].substep_accumulator = 0;			// will become max negative during per-motor setup;
+		st_pre.mot[i].direction_change = true;
+		st_run.mot[i].substep_accumulator = 0;			// will become max negative during per-motor setup;
 	}
 //	en_reset_encoders();
 }
@@ -168,6 +168,14 @@ void st_cycle_start(void)
 void st_cycle_end(void)
 {
 	mp_print_motor_positions();
+}
+
+stat_t st_clc(cmdObj_t *cmd)	// clear diagnostic counters, reset stepper prep
+{
+	st_reset();
+	en_reset_encoders();
+	mp_init_runtime();
+	return(STAT_OK);
 }
 
 /*
@@ -291,22 +299,22 @@ ISR(TIMER_DDA_ISR_vect)
 	if ((st_run.mot[MOTOR_1].substep_accumulator += st_run.mot[MOTOR_1].substep_increment) > 0) {
 		PORT_MOTOR_1_VPORT.OUT |= STEP_BIT_bm;		// turn step bit on
 		st_run.mot[MOTOR_1].substep_accumulator -= st_run.dda_ticks_X_substeps;
-		en.en[MOTOR_1].steps_run += en.en[MOTOR_1].step_sign;
+		INCREMENT_ENCODER(MOTOR_1);
 	}
 	if ((st_run.mot[MOTOR_2].substep_accumulator += st_run.mot[MOTOR_2].substep_increment) > 0) {
 		PORT_MOTOR_2_VPORT.OUT |= STEP_BIT_bm;
 		st_run.mot[MOTOR_2].substep_accumulator -= st_run.dda_ticks_X_substeps;
-		en.en[MOTOR_2].steps_run += en.en[MOTOR_2].step_sign;
+		INCREMENT_ENCODER(MOTOR_2);
 	}
 	if ((st_run.mot[MOTOR_3].substep_accumulator += st_run.mot[MOTOR_3].substep_increment) > 0) {
 		PORT_MOTOR_3_VPORT.OUT |= STEP_BIT_bm;
 		st_run.mot[MOTOR_3].substep_accumulator -= st_run.dda_ticks_X_substeps;
-		en.en[MOTOR_3].steps_run += en.en[MOTOR_3].step_sign;
+		INCREMENT_ENCODER(MOTOR_3);
 	}
 	if ((st_run.mot[MOTOR_4].substep_accumulator += st_run.mot[MOTOR_4].substep_increment) > 0) {
 		PORT_MOTOR_4_VPORT.OUT |= STEP_BIT_bm;
 		st_run.mot[MOTOR_4].substep_accumulator -= st_run.dda_ticks_X_substeps;
-		en.en[MOTOR_4].steps_run += en.en[MOTOR_4].step_sign;
+		INCREMENT_ENCODER(MOTOR_4);
 	}
 
 	// pulse stretching for using external drivers.- turn step bits off
@@ -427,7 +435,7 @@ static void _load_move()
 			// Enable the stepper and start motor power management
 			PORT_MOTOR_1_VPORT.OUT &= ~MOTOR_ENABLE_BIT_bm;				// energize motor
 			st_run.mot[MOTOR_1].power_state = MOTOR_RUNNING;			// set power management state
-			en.en[MOTOR_1].step_sign = st_pre.mot[MOTOR_1].step_sign;	// transfer in the signed step increment
+			SET_ENCODER_SIGN(MOTOR_1, st_pre.mot[MOTOR_1].step_sign);
 
 		} else {  // Motor has 0 steps; might need to energize motor for power mode processing
 			if (st_cfg.mot[MOTOR_1].power_mode == MOTOR_IDLE_WHEN_STOPPED) {
@@ -436,8 +444,7 @@ static void _load_move()
 			}
 		}
 		// accumulate counted steps to the step position and zero out counted steps for the segment currently being loaded
-		en.en[MOTOR_1].encoder_steps += en.en[MOTOR_1].steps_run;// NB: steps_run can be + or - value
-		en.en[MOTOR_1].steps_run = 0;
+		ACCUMULATE_ENCODER(MOTOR_1);
 
 		//**** MOTOR_2 LOAD ****
 
@@ -450,15 +457,14 @@ static void _load_move()
 			}
 			PORT_MOTOR_2_VPORT.OUT &= ~MOTOR_ENABLE_BIT_bm;
 			st_run.mot[MOTOR_2].power_state = MOTOR_RUNNING;
-			en.en[MOTOR_2].step_sign = st_pre.mot[MOTOR_2].step_sign;
+			SET_ENCODER_SIGN(MOTOR_2, st_pre.mot[MOTOR_2].step_sign);
 		} else {
 			if (st_cfg.mot[MOTOR_2].power_mode == MOTOR_IDLE_WHEN_STOPPED) {
 				PORT_MOTOR_2_VPORT.OUT &= ~MOTOR_ENABLE_BIT_bm;
 				st_run.mot[MOTOR_2].power_state = MOTOR_START_IDLE_TIMEOUT;
 			}
 		}
-		en.en[MOTOR_2].encoder_steps += en.en[MOTOR_2].steps_run;
-		en.en[MOTOR_2].steps_run = 0;
+		ACCUMULATE_ENCODER(MOTOR_2);
 
 		//**** MOTOR_3 LOAD ****
 
@@ -471,15 +477,14 @@ static void _load_move()
 			}
 			PORT_MOTOR_3_VPORT.OUT &= ~MOTOR_ENABLE_BIT_bm;
 			st_run.mot[MOTOR_3].power_state = MOTOR_RUNNING;
-			en.en[MOTOR_3].step_sign = st_pre.mot[MOTOR_3].step_sign;
+			SET_ENCODER_SIGN(MOTOR_3, st_pre.mot[MOTOR_3].step_sign);
 		} else {
 			if (st_cfg.mot[MOTOR_3].power_mode == MOTOR_IDLE_WHEN_STOPPED) {
 				PORT_MOTOR_3_VPORT.OUT &= ~MOTOR_ENABLE_BIT_bm;
 				st_run.mot[MOTOR_3].power_state = MOTOR_START_IDLE_TIMEOUT;
 			}
 		}
-		en.en[MOTOR_3].encoder_steps += en.en[MOTOR_3].steps_run;
-		en.en[MOTOR_3].steps_run = 0;
+		ACCUMULATE_ENCODER(MOTOR_3);
 
 		//**** MOTOR_4 LOAD ****
 
@@ -492,15 +497,14 @@ static void _load_move()
 			}
 			PORT_MOTOR_4_VPORT.OUT &= ~MOTOR_ENABLE_BIT_bm;
 			st_run.mot[MOTOR_4].power_state = MOTOR_RUNNING;
-			en.en[MOTOR_4].step_sign = st_pre.mot[MOTOR_4].step_sign;
+			SET_ENCODER_SIGN(MOTOR_4, st_pre.mot[MOTOR_4].step_sign);
 		} else {
 			if (st_cfg.mot[MOTOR_4].power_mode == MOTOR_IDLE_WHEN_STOPPED) {
 				PORT_MOTOR_4_VPORT.OUT &= ~MOTOR_ENABLE_BIT_bm;
 				st_run.mot[MOTOR_4].power_state = MOTOR_START_IDLE_TIMEOUT;
 			}
 		}
-		en.en[MOTOR_4].encoder_steps += en.en[MOTOR_4].steps_run;
-		en.en[MOTOR_4].steps_run = 0;
+		ACCUMULATE_ENCODER(MOTOR_4);
 
 		//**** do this last ****
 
@@ -532,15 +536,12 @@ static void _load_move()
  *	Microseconds - how many microseconds the segment should run 
  */
 
-stat_t st_prep_line(float steps[], float microseconds)
-//stat_t st_prep_line(float steps[], float microseconds, float encoder_error[])
+stat_t st_prep_line(float steps[], float microseconds, float step_error[])
 {
 	// trap conditions that would prevent queueing the line
-	if (st_pre.exec_state != PREP_BUFFER_OWNED_BY_EXEC) { return (STAT_INTERNAL_ERROR);
-//		} else if (isinf(microseconds)) { return (cm_hard_alarm(STAT_PREP_LINE_MOVE_TIME_IS_INFINITE));
-//		} else if (isnan(microseconds)) { return (cm_hard_alarm(STAT_PREP_LINE_MOVE_TIME_IS_NAN));
-		} else if (isinf(microseconds)) { return (STAT_PREP_LINE_MOVE_TIME_IS_INFINITE);
-		} else if (isnan(microseconds)) { return (STAT_PREP_LINE_MOVE_TIME_IS_NAN);
+	if (st_pre.exec_state != PREP_BUFFER_OWNED_BY_EXEC) { return (cm_hard_alarm(STAT_INTERNAL_ERROR));
+		} else if (isinf(microseconds)) { return (cm_hard_alarm(STAT_PREP_LINE_MOVE_TIME_IS_INFINITE));	// not supposed to happen
+		} else if (isnan(microseconds)) { return (cm_hard_alarm(STAT_PREP_LINE_MOVE_TIME_IS_NAN));		// not supposed to happen
 		} else if (microseconds < EPSILON) { return (STAT_MINIMUM_TIME_MOVE_ERROR);
 	}
 	// setup segment parameters
@@ -567,14 +568,33 @@ stat_t st_prep_line(float steps[], float microseconds)
 		if (steps[i] >= 0) {					// positive direction
 			st_pre.mot[i].direction = DIRECTION_CW ^ st_cfg.mot[i].polarity;
 			st_pre.mot[i].step_sign = 1;
-			} else {
+		} else {
 			st_pre.mot[i].direction = DIRECTION_CCW ^ st_cfg.mot[i].polarity;
 			st_pre.mot[i].step_sign = -1;
 		}
 		st_pre.mot[i].direction_change = st_pre.mot[i].direction ^ previous_direction;
 
+		// Perform step correction
+//		if ((step_error[i] > STEP_CORRECTION_THRESHOLD) || (step_error[i] < -STEP_CORRECTION_THRESHOLD))  {
+//			steps[i] -= STEP_CORRECTION_AMOUNT;
+//		}
+/*
+		if (step_error[i] > STEP_CORRECTION_THRESHOLD) {
+			steps[i] -= STEP_CORRECTION_AMOUNT;
+		}
+		if (step_error[i] < -STEP_CORRECTION_THRESHOLD) {
+			steps[i] += STEP_CORRECTION_AMOUNT;
+		}
+*/
+/* last night's style */
+		if (--st_pre.correction_samples < 0) {
+			st_pre.correction_samples = STEP_CORRECTION_SAMPLE_RATE;
+			if (step_error[i] > STEP_CORRECTION_THRESHOLD) steps[i] += STEP_CORRECTION_AMOUNT;
+			if (step_error[i] < -STEP_CORRECTION_THRESHOLD) steps[i] -= STEP_CORRECTION_AMOUNT;
+		}
+		
 		// Compute substeb increment. The accumulator must be *exactly* the incoming
-		// fractional steps times the substep multipler or positional drift will occur.
+		// fractional steps times the substep multiplier or positional drift will occur.
 		// Rounding is performed to eliminate a negative bias in the int32 conversion
 		// that results in long-term negative drift. (fabs/round order doesn't matter)
 

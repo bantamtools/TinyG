@@ -88,8 +88,14 @@
 #ifndef ENCODER_H_ONCE
 #define ENCODER_H_ONCE
 
-
 /**** Configs and Constants ****/
+
+/**** Macros ****/
+// used to abstract the encoder code out of the stepper so it can be managed in one place
+
+#define SET_ENCODER_SIGN(m,s)	en.en[m].step_sign = s;
+#define INCREMENT_ENCODER(m)	en.en[m].steps_run += en.en[m].step_sign;
+#define ACCUMULATE_ENCODER(m)	en.en[m].encoder_steps += en.en[m].steps_run; en.en[m].steps_run = 0;
 
 /**** Structures ****/
 
@@ -111,10 +117,10 @@ extern enEncoders_t en;
 /**** FUNCTION PROTOTYPES ****/
 
 void encoder_init(void);
-stat_t en_assertions(void);
-void en_reset_encoders(void);
-int32_t en_sample_encoder(uint8_t motor);
-void en_sample_encoders(int32_t flag);
+void encoder_init_assertions(void);
+stat_t encoder_test_assertions(void);
 
+void en_reset_encoders(void);
+int32_t en_read_encoder(uint8_t motor);
 
 #endif	// End of include guard: ENCODER_H_ONCE

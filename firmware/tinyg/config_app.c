@@ -168,16 +168,17 @@ const cfgItem_t cfgArray[] PROGMEM = {
 	{ "", "qf",  _f00, 0, tx_print_nul, get_nul, cm_run_qf,(float *)&cs.null, 0 },	// queue flush
 	{ "", "rx",  _f00, 0, tx_print_int, get_rx,  set_nul,  (float *)&cs.null, 0 },	// space in RX buffer
 	{ "", "msg", _f00, 0, tx_print_str, get_nul, set_nul,  (float *)&cs.null, 0 },	// string for generic messages
+	{ "", "clc", _f00, 0, tx_print_nul, st_clc, st_clc,    (float *)&cs.null, 0 },	// clear diagnostic step counters
 	{ "", "clear",_f00,0, tx_print_nul, cm_clear,cm_clear, (float *)&cs.null, 0 },	// GET a clear to clear soft alarm
 //	{ "", "sx",  _f00, 0, tx_print_nul, run_sx,  run_sx ,  (float *)&cs.null, 0 },	// send XOFF, XON test
 
-	{ "", "test",_f00, 0, tx_print_nul, help_test,		 run_test, 	  (float *)&cs.null,0 },	// run tests, print test help screen
-	{ "", "defa",_f00, 0, tx_print_nul, help_defa,		 set_defaults,(float *)&cs.null,0 },	// set/print defaults / help screen
+	{ "", "test",_f00, 0, tx_print_nul, help_test, run_test, (float *)&cs.null,0 },	// run tests, print test help screen
+	{ "", "defa",_f00, 0, tx_print_nul, help_defa, set_defaults,(float *)&cs.null,0 },	// set/print defaults / help screen
 	{ "", "boot",_f00, 0, tx_print_nul, help_boot_loader,hw_run_boot, (float *)&cs.null,0 },
 
 #ifdef __HELP_SCREENS
-	{ "", "help",_f00, 0, tx_print_nul, help_config,	 set_nul, 	  (float *)&cs.null,0 },	// prints config help screen
-	{ "", "h",   _f00, 0, tx_print_nul, help_config,	 set_nul, 	  (float *)&cs.null,0 },	// alias for "help"
+	{ "", "help",_f00, 0, tx_print_nul, help_config, set_nul, (float *)&cs.null,0 },  // prints config help screen
+	{ "", "h",   _f00, 0, tx_print_nul, help_config, set_nul, (float *)&cs.null,0 },  // alias for "help"
 #endif
 
 	// Motor parameters
@@ -387,29 +388,6 @@ const cfgItem_t cfgArray[] PROGMEM = {
 	{ "g59","g59a",_fip, 3, cm_print_cofs, get_flu, set_flu,(float *)&cm.offset[G59][AXIS_A], G59_A_OFFSET },
 	{ "g59","g59b",_fip, 3, cm_print_cofs, get_flu, set_flu,(float *)&cm.offset[G59][AXIS_B], G59_B_OFFSET },
 	{ "g59","g59c",_fip, 3, cm_print_cofs, get_flu, set_flu,(float *)&cm.offset[G59][AXIS_C], G59_C_OFFSET },
-/*
- // HACK: use these registers since I can't get the command table to load correctly (Estee)
-	{ "g57","g57x",_fip, 3, cm_print_cofs, get_data, set_data,(float *)&cm.offset[G57][AXIS_X], G57_X_OFFSET },
-	{ "g57","g57y",_fip, 3, cm_print_cofs, get_data, set_data,(float *)&cm.offset[G57][AXIS_Y], G57_Y_OFFSET },
-	{ "g57","g57z",_fip, 3, cm_print_cofs, get_data, set_data,(float *)&cm.offset[G57][AXIS_Z], G57_Z_OFFSET },
-	{ "g57","g57a",_fip, 3, cm_print_cofs, get_data, set_data,(float *)&cm.offset[G57][AXIS_A], G57_A_OFFSET },
-	{ "g57","g57b",_fip, 3, cm_print_cofs, get_data, set_data,(float *)&cm.offset[G57][AXIS_B], G57_B_OFFSET },
-	{ "g57","g57c",_fip, 3, cm_print_cofs, get_data, set_data,(float *)&cm.offset[G57][AXIS_C], G57_C_OFFSET },
-
-	{ "g58","g58x",_fip, 0, cm_print_cofs, get_data, set_data,(float *)&cm.offset[G58][AXIS_X], G58_X_OFFSET },
-	{ "g58","g58y",_fip, 0, cm_print_cofs, get_data, set_data,(float *)&cm.offset[G58][AXIS_Y], G58_Y_OFFSET },
-	{ "g58","g58a",_fip, 0, cm_print_cofs, get_data, set_data,(float *)&cm.offset[G58][AXIS_A], G58_A_OFFSET },
-	{ "g58","g58z",_fip, 0, cm_print_cofs, get_data, set_data,(float *)&cm.offset[G58][AXIS_Z], G58_Z_OFFSET },
-	{ "g58","g58b",_fip, 0, cm_print_cofs, get_data, set_data,(float *)&cm.offset[G58][AXIS_B], G58_B_OFFSET },
-	{ "g58","g58c",_fip, 0, cm_print_cofs, get_data, set_data,(float *)&cm.offset[G58][AXIS_C], G58_C_OFFSET },
-
-	{ "g59","g59x",_fip, 3, cm_print_cofs, get_data, set_data,(float *)&cm.offset[G59][AXIS_X], G59_X_OFFSET },
-	{ "g59","g59y",_fip, 3, cm_print_cofs, get_data, set_data,(float *)&cm.offset[G59][AXIS_Y], G59_Y_OFFSET },
-	{ "g59","g59z",_fip, 3, cm_print_cofs, get_data, set_data,(float *)&cm.offset[G59][AXIS_Z], G59_Z_OFFSET },
-	{ "g59","g59a",_fip, 3, cm_print_cofs, get_data, set_data,(float *)&cm.offset[G59][AXIS_A], G59_A_OFFSET },
-	{ "g59","g59b",_fip, 3, cm_print_cofs, get_data, set_data,(float *)&cm.offset[G59][AXIS_B], G59_B_OFFSET },
-	{ "g59","g59c",_fip, 3, cm_print_cofs, get_data, set_data,(float *)&cm.offset[G59][AXIS_C], G59_C_OFFSET },
-*/
 
 	{ "g92","g92x",_fin, 3, cm_print_cofs, get_flu, set_nul,(float *)&cm.gmx.origin_offset[AXIS_X], 0 },// G92 handled differently
 	{ "g92","g92y",_fin, 3, cm_print_cofs, get_flu, set_nul,(float *)&cm.gmx.origin_offset[AXIS_Y], 0 },
@@ -442,8 +420,9 @@ const cfgItem_t cfgArray[] PROGMEM = {
 	// System parameters
 	{ "sys","ja",  _f07, 0, cm_print_ja,  get_flu,   set_flu,    (float *)&cm.junction_acceleration,JUNCTION_ACCELERATION },
 	{ "sys","ct",  _f07, 4, cm_print_ct,  get_flu,   set_flu,    (float *)&cm.chordal_tolerance,	CHORDAL_TOLERANCE },
+	{ "sys","sl",  _f07, 0, cm_print_sl,  get_ui8,   set_ui8,    (float *)&cm.soft_limit_enable,	SOFT_LIMIT_ENABLE },
 	{ "sys","st",  _f07, 0, sw_print_st,  get_ui8,   sw_set_st,  (float *)&sw.switch_type,			SWITCH_TYPE },
-	{ "sys","mt",  _f07, 2, st_print_mt,  get_flt,   st_set_mt,  (float *)&st_cfg.motor_idle_timeout, 	MOTOR_IDLE_TIMEOUT},
+	{ "sys","mt",  _f07, 2, st_print_mt,  get_flt,   st_set_mt,  (float *)&st_cfg.motor_idle_timeout,MOTOR_IDLE_TIMEOUT},
 	{ "",   "me",  _f00, 0, tx_print_str, st_set_me, st_set_me,  (float *)&cs.null, 0 },
 	{ "",   "md",  _f00, 0, tx_print_str, st_set_md, st_set_md,  (float *)&cs.null, 0 },
 
@@ -508,32 +487,37 @@ const cfgItem_t cfgArray[] PROGMEM = {
 	{ "udd","udd3", _fip, 0, tx_print_int, get_int, set_int,(float *)&cfg.user_data_d[3], USER_DATA_D3 },
 
 	{ "_te","_tex",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.target[AXIS_X], 0 },  // X target endpoint
-	{ "_te","_tey",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.target[AXIS_Y], 0 },  // Y target endpoint
-	{ "_te","_tez",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.target[AXIS_Z], 0 },  // Z target endpoint
+	{ "_te","_tey",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.target[AXIS_Y], 0 },
+	{ "_te","_tez",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.target[AXIS_Z], 0 },
 
 	{ "_tr","_trx",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.gm.target[AXIS_X], 0 },  // X target runtime
-	{ "_tr","_try",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.gm.target[AXIS_Y], 0 },  // Y target runtime
-	{ "_tr","_trz",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.gm.target[AXIS_Z], 0 },  // Z target runtime
+	{ "_tr","_try",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.gm.target[AXIS_Y], 0 },
+	{ "_tr","_trz",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.gm.target[AXIS_Z], 0 },
 
 	{ "_ts","_ts1",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.target_steps[MOTOR_1], 0 },  // Motor 1 target steps
-	{ "_ts","_ts2",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.target_steps[MOTOR_2], 0 },  // Motor 2 target steps
-	{ "_ts","_ts3",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.target_steps[MOTOR_3], 0 },  // Motor 3 target steps
-	{ "_ts","_ts4",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.target_steps[MOTOR_4], 0 },  // Motor 4 target steps
+	{ "_ts","_ts2",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.target_steps[MOTOR_2], 0 },
+	{ "_ts","_ts3",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.target_steps[MOTOR_3], 0 },
+	{ "_ts","_ts4",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.target_steps[MOTOR_4], 0 },
 
 	{ "_ps","_ps1",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.position_steps[MOTOR_1], 0 },// Motor 1 position steps
-	{ "_ps","_ps2",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.position_steps[MOTOR_2], 0 },// Motor 2 position steps
-	{ "_ps","_ps3",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.position_steps[MOTOR_3], 0 },// Motor 3 position steps
-	{ "_ps","_ps4",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.position_steps[MOTOR_4], 0 },// Motor 4 position steps
+	{ "_ps","_ps2",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.position_steps[MOTOR_2], 0 },
+	{ "_ps","_ps3",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.position_steps[MOTOR_3], 0 },
+	{ "_ps","_ps4",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.position_steps[MOTOR_4], 0 },
+
+	{ "_ds","_ds1",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.delayed_steps[MOTOR_1], 0 },// Motor 1 delayed steps
+	{ "_ds","_ds2",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.delayed_steps[MOTOR_2], 0 },
+	{ "_ds","_ds3",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.delayed_steps[MOTOR_3], 0 },
+	{ "_ds","_ds4",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.delayed_steps[MOTOR_4], 0 },
 
 	{ "_ns","_ns1",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.encoder_steps[MOTOR_1], 0 }, // Motor 1 eNcoder steps
-	{ "_ns","_ns2",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.encoder_steps[MOTOR_2], 0 }, // Motor 2 eNcoder steps
-	{ "_ns","_ns3",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.encoder_steps[MOTOR_3], 0 }, // Motor 3 eNcoder steps
-	{ "_ns","_ns4",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.encoder_steps[MOTOR_4], 0 }, // Motor 4 eNcoder steps
+	{ "_ns","_ns2",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.encoder_steps[MOTOR_2], 0 },
+	{ "_ns","_ns3",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.encoder_steps[MOTOR_3], 0 },
+	{ "_ns","_ns4",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.encoder_steps[MOTOR_4], 0 },
 
-	{ "_es","_es1",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.encoder_error[MOTOR_1], 0 }, // Motor 1 error steps
-	{ "_es","_es2",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.encoder_error[MOTOR_2], 0 }, // Motor 2 error steps
-	{ "_es","_es3",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.encoder_error[MOTOR_3], 0 }, // Motor 3 error steps
-	{ "_es","_es4",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.encoder_error[MOTOR_4], 0 }, // Motor 4 error steps
+	{ "_es","_es1",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.step_error[MOTOR_1], 0 }, // Motor 1 error steps
+	{ "_es","_es2",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.step_error[MOTOR_2], 0 },
+	{ "_es","_es3",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.step_error[MOTOR_3], 0 },
+	{ "_es","_es4",_f00, 4, tx_print_flt, get_flt, set_nul,(float *)&mr.step_error[MOTOR_4], 0 },
 
 	// Persistence for status report - must be in sequence
 	// *** Count must agree with CMD_STATUS_REPORT_LEN in config.h ***
@@ -617,6 +601,7 @@ const cfgItem_t cfgArray[] PROGMEM = {
 	{ "","_tr",_f00, 0, tx_print_nul, get_grp, set_grp,(float *)&cs.null,0 },	// target axis runtime group
 	{ "","_ts",_f00, 0, tx_print_nul, get_grp, set_grp,(float *)&cs.null,0 },	// target motor steps group
 	{ "","_ps",_f00, 0, tx_print_nul, get_grp, set_grp,(float *)&cs.null,0 },	// position motor steps group
+	{ "","_ds",_f00, 0, tx_print_nul, get_grp, set_grp,(float *)&cs.null,0 },	// delayed motor steps group
 	{ "","_ns",_f00, 0, tx_print_nul, get_grp, set_grp,(float *)&cs.null,0 },	// encoder motor steps group
 	{ "","_es",_f00, 0, tx_print_nul, get_grp, set_grp,(float *)&cs.null,0 },	// encoder motor error group
 
@@ -630,7 +615,7 @@ const cfgItem_t cfgArray[] PROGMEM = {
 
 /***** Make sure these defines line up with any changes in the above table *****/
 
-#define CMD_COUNT_GROUPS 		37		// count of simple groups
+#define CMD_COUNT_GROUPS 		38		// count of simple groups
 #define CMD_COUNT_UBER_GROUPS 	4 		// count of uber-groups
 
 /* <DO NOT MESS WITH THESE DEFINES> */

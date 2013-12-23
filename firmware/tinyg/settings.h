@@ -42,6 +42,7 @@
 
 // Machine configuration settings
 #define CHORDAL_TOLERANCE 			0.001			// chord accuracy for arc drawing
+#define SOFT_LIMIT_ENABLE			0				// 0 = off, 1 = on
 #define SWITCH_TYPE 				SW_TYPE_NORMALLY_OPEN// one of: SW_TYPE_NORMALLY_OPEN, SW_TYPE_NORMALLY_CLOSED
 #define MOTOR_IDLE_TIMEOUT			2.00			// seconds to maintain motor at full power before idling
 #define MOTOR_POWER_LEVEL			25				// default motor power level (ARM only)
@@ -57,11 +58,17 @@
 #define JSON_FOOTER_DEPTH			0				// 0 = new style, 1 = old style
 
 //#define SR_VERBOSITY				SR_OFF		// one of: SR_OFF, SR_FILTERED, SR_VERBOSE
-#define SR_VERBOSITY				SR_FILTERED		// one of: SR_OFF, SR_FILTERED, SR_VERBOSE
+//#define SR_VERBOSITY				SR_FILTERED		// one of: SR_OFF, SR_FILTERED, SR_VERBOSE
+#define SR_VERBOSITY				SR_VERBOSE		// one of: SR_OFF, SR_FILTERED, SR_VERBOSE
+
 #define STATUS_REPORT_MIN_MS		50				// milliseconds - enforces a viable minimum
 #define STATUS_REPORT_INTERVAL_MS	250				// milliseconds - set $SV=0 to disable
-#define SR_DEFAULTS "line","posx","posy","posz","posa","feed","vel","unit","coor","dist","frmo","momo","stat"
+//#define SR_DEFAULTS "line","posx","posy","posz","posa","feed","vel","unit","coor","dist","frmo","momo","stat"
 //#define SR_DEFAULTS "line","qr","qi","qo","posx","posy","posz","posa","feed","vel","unit","coor","dist","frmo","momo","stat"
+//#define SR_DEFAULTS "mpox","_tex","_trx","mpoy","_tey","_try","mpoz","_tez","_trz","unit","stat","coor","momo","dist","home","hold","macs","cycs","mots","plan"
+//#define SR_DEFAULTS "mpox","_trx","_ds4","_ns4","mpoy","_try","_ds3","_ns3","mpoz","_trz","_ds2","_ns2","_es2","stat"
+#define SR_DEFAULTS "mpox","_ds4","_ns4","_es4","mpoy","_ds3","_ns3","_es3","mpoz","_ds2","_ns2","_es2","stat"
+//#define SR_DEFAULTS "mpoz","_trz","_ts2","_ps2","_ds2","_ns2","_es2","stat"
 
 #define QR_VERBOSITY				QR_OFF			// one of: QR_OFF, QR_SINGLE, QR_TRIPLE
 //#define QR_VERBOSITY				QR_TRIPLE

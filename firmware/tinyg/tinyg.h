@@ -44,7 +44,7 @@
 
 /****** REVISIONS ******/
 
-//#define TINYG_FIRMWARE_BUILD   		397.31	// homing mods to accommodate soft limits
+//#define TINYG_FIRMWARE_BUILD   		397.38	// folding in string handling from dev branch
 #define TINYG_FIRMWARE_VERSION		0.97	// firmware major version
 #define TINYG_HARDWARE_PLATFORM		1		// hardware platform indicator (1 = Xmega series)
 #define TINYG_HARDWARE_VERSION		8		// hardware platform revision number (defaults to)
@@ -52,7 +52,6 @@
 
 /****** COMPILE-TIME SETTINGS ******/
 
-#define __ORIG_CORRECTION_CODE
 #define __JERK_EXEC		// comment to use forward difference based exec vs jerk computed exec
 //#define __SIMULATION	// shorthand to keep from having to comment and uncomment the below:
 
@@ -99,6 +98,9 @@ typedef char char_t;			// ARM/C++ version uses uint8_t as char_t
 #define GET_TABLE_FLOAT(a) pgm_read_float(&cfgArray[cmd->index].a)	// get float value from cfgArray
 #define GET_TOKEN_BYTE(a)  (char_t)pgm_read_byte(&cfgArray[i].a)	// get token byte value from cfgArray
 
+// populate the shared buffer with the token string given the index
+#define GET_TOKEN_STRING(i,a) strcpy_P(a, (char *)&cfgArray[(index_t)i].token);
+
 // get text from an array of strings in PGM and convert to RAM string
 #define GET_TEXT_ITEM(b,a) strncpy_P(shared_buf,(const char *)pgm_read_word(&b[a]), MESSAGE_LEN-1) 
 
@@ -133,6 +135,7 @@ typedef uint8_t char_t;			// In the ARM/GCC++ version char_t is typedef'd to uin
 #define GET_TABLE_FLOAT(a) cfgArray[cmd->index].a	// get byte value from cfgArray
 #define GET_TOKEN_BYTE(a)  (char_t)cfgArray[i].a	// get token byte value from cfgArray
 
+#define GET_TOKEN_STRING(i,a) cfgArray[(index_t)i].a
 #define GET_TEXT_ITEM(b,a) b[a]						// get text from an array of strings in flash
 #define GET_UNITS(a) msg_units[cm_get_units_mode(a)]
 
@@ -317,14 +320,14 @@ char *get_status_message(stat_t status);
 #define	STAT_JOGGING_CYCLE_FAILED 74		// jogging cycle did not complete
 #define	STAT_MACHINE_ALARMED 75				// machine is alarmed. Command not processed
 #define	STAT_LIMIT_SWITCH_HIT 76			// a limit switch was hit causing sutdown
-#define	STAT_ERROR_77 77
-#define	STAT_ERROR_78 78
-#define	STAT_ERROR_79 79
-#define	STAT_ERROR_80 80
-#define	STAT_ERROR_81 81
-#define	STAT_ERROR_82 82
-#define	STAT_ERROR_83 83
-#define	STAT_ERROR_84 84
+#define	STAT_HOMING_ERROR_BAD_OR_NO_AXIS 77
+#define	STAT_HOMING_ERROR_ZERO_SEARCH_VELOCITY 78
+#define	STAT_HOMING_ERROR_ZERO_LATCH_VELOCITY 79
+#define	STAT_HOMING_ERROR_TRAVEL_MIN_MAX_IS_ZERO 80
+#define	STAT_HOMING_ERROR_NEGATIVE_LATCH_BACKOFF 81
+#define	STAT_HOMING_ERROR_SWITCH_MISCONFIGURATION 82
+#define	STAT_PREP_LINE_MOVE_TIME_IS_INFINITE 83
+#define	STAT_PREP_LINE_MOVE_TIME_IS_NAN 84
 #define	STAT_ERROR_85 85
 #define	STAT_ERROR_86 86
 #define	STAT_ERROR_87 87
@@ -346,12 +349,11 @@ char *get_status_message(stat_t status);
 #define STAT_GENERIC_EXCEPTION_REPORT 101	// used for test
 #define	STAT_MEMORY_FAULT 102				// generic memory corruption detected by magic numbers
 #define	STAT_STACK_OVERFLOW 103
-#define	STAT_CONTROLLER_ASSERTION_FAILURE 104
-#define	STAT_CANONICAL_MACHINE_ASSERTION_FAILURE 105
-#define	STAT_PLANNER_ASSERTION_FAILURE 106
-#define	STAT_STEPPER_ASSERTION_FAILURE 107
-#define	STAT_XIO_ASSERTION_FAILURE 108
-#define	STAT_PREP_LINE_MOVE_TIME_IS_INFINITE 109
-#define	STAT_PREP_LINE_MOVE_TIME_IS_NAN 110
+#define	STAT_XIO_ASSERTION_FAILURE 104
+#define	STAT_CONTROLLER_ASSERTION_FAILURE 105
+#define	STAT_CANONICAL_MACHINE_ASSERTION_FAILURE 106
+#define	STAT_PLANNER_ASSERTION_FAILURE 107
+#define	STAT_STEPPER_ASSERTION_FAILURE 108
+#define	STAT_ENCODER_ASSERTION_FAILURE 109
 
 #endif // End of include guard: TINYG2_H_ONCE

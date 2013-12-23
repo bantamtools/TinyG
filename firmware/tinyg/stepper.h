@@ -185,25 +185,25 @@
 // Currently there is no distinction between IDLE and OFF (DEENERGIZED)
 // In the future IDLE will be powered at a low, torque-maintaining current
 
-enum motorPowerState {				// used w/start and stop flags to sequence motor power
-	MOTOR_OFF = 0,					// motor is stopped and deenergized
-	MOTOR_IDLE,						// motor is stopped and may be partially energized for torque maintenance
-	MOTOR_TIME_IDLE_TIMEOUT,		// run idle timeout
-	MOTOR_START_IDLE_TIMEOUT,		// transitional state to start idle timers
-	MOTOR_STOPPED,					// motor is stopped and fully energized
-	MOTOR_RUNNING					// motor is running (and fully energized)
+enum motorPowerState {					// used w/start and stop flags to sequence motor power
+	MOTOR_OFF = 0,						// motor is stopped and deenergized
+	MOTOR_IDLE,							// motor is stopped and may be partially energized for torque maintenance
+	MOTOR_TIME_IDLE_TIMEOUT,			// run idle timeout
+	MOTOR_START_IDLE_TIMEOUT,			// transitional state to start idle timers
+	MOTOR_STOPPED,						// motor is stopped and fully energized
+	MOTOR_RUNNING						// motor is running (and fully energized)
 };
 
 enum cmStepperPowerMode {
-	MOTOR_ENERGIZED_DURING_CYCLE=0,	// motor is fully powered during cycles
-	MOTOR_IDLE_WHEN_STOPPED,		// idle motor shortly after it's stopped - even in cycle
-	MOTOR_POWER_REDUCED_WHEN_IDLE,	// enable Vref current reduction (not implemented yet)
-	DYNAMIC_MOTOR_POWER				// adjust motor current with velocity (not implemented yet)
+	MOTOR_ENERGIZED_DURING_CYCLE=0,		// motor is fully powered during cycles
+	MOTOR_IDLE_WHEN_STOPPED,			// idle motor shortly after it's stopped - even in cycle
+	MOTOR_POWER_REDUCED_WHEN_IDLE,		// enable Vref current reduction (not implemented yet)
+	DYNAMIC_MOTOR_POWER					// adjust motor current with velocity (not implemented yet)
 };
 
 enum prepBufferState {
-	PREP_BUFFER_OWNED_BY_LOADER = 0,// staging buffer is ready for load
-	PREP_BUFFER_OWNED_BY_EXEC		// staging buffer is being loaded
+	PREP_BUFFER_OWNED_BY_LOADER = 0,	// staging buffer is ready for load
+	PREP_BUFFER_OWNED_BY_EXEC			// staging buffer is being loaded
 };
 
 // Stepper power management settings
@@ -216,20 +216,20 @@ enum prepBufferState {
  * 	DDA_SUBSTEPS sets the amount of fractional precision for substepping.
  *	Substepping is kind of like microsteps done in software to make
  *	interpolation more accurate.
- *
- *	Set to 1 to disable, but don't do this or you will lose a lot of accuracy.
  */
-#define DDA_SUBSTEPS (float)5000000		// 5,000,000 accumulates substeps to max decimal places
-//#define DDA_SUBSTEPS (float)100000	// 100,000 accumulates substeps to 6 decimal places
+#define DDA_SUBSTEPS				(float)5000000	// 5,000,000 accumulates substeps to max decimal places
+//#define DDA_SUBSTEPS				(float)100000	// 100,000 accumulates substeps to 6 decimal places
 
-/* Accumulator resets
- * 	You want to reset the DDA accumulators if the new ticks value is way less 
- *	than previous value, but otherwise you should leave the accumulators alone.
- *	Preserving the accumulator value from the previous segment aligns pulse 
- *	phasing between segments. However, if the new accumulator is going to be 
- *	much less than the old one you must reset it or risk motor stalls.
+/* Step correction settings
+ *	Step correction settings determine how the encoder error is fed back to correct position.
+ *	Since the and step error are running 2 segments behind the current segment you have to be careful 
+ *	not to overcompensate. The threshold determines if a correction should be applied, and the amount
+ *	is how much. If threshold is to small and/or amount too large you will get a runaway correction
+ *	and error will grow instead of shrink
  */
-#define ACCUMULATOR_RESET_FACTOR 2	// amount counter range can safely change
+#define STEP_CORRECTION_THRESHOLD	(float)1.01		// magnitude of step error to apply correction 
+#define STEP_CORRECTION_AMOUNT		(float)0.10		// step correction to apply in a single segment
+#define STEP_CORRECTION_SAMPLE_RATE	5				// number of segments to wait between error samples
 
 /*
  * Stepper control structures
@@ -289,7 +289,6 @@ typedef struct stRunSingleton {		// Stepper static values and axis parameters
 // Must be careful about volatiles in this one
 
 typedef struct stPrepMotor {
-//	uint8_t cycle_start;			// new cycle: reset stepper on its first movement
 	uint8_t direction_change;		// set true if direction changed
 	int8_t step_sign;				// set to +1 or -1 for encoders
 	int8_t direction;				// travel direction corrected for polarity
@@ -300,8 +299,8 @@ typedef struct stPrepSingleton {
 	uint16_t magic_start;			// magic number to test memory integrity
 	volatile uint8_t exec_state;	// move execution state
 	uint8_t move_type;				// move type
-	uint8_t reset_flag;	  // LEGACY // 
-	uint32_t prev_ticks;  // LEGACY // tick count from previous move
+	uint8_t correction_samples;		// down count for sample rate
+	
 	uint16_t dda_period;			// DDA or dwell clock period setting
 	uint32_t dda_ticks;				// DDA or dwell ticks for the move
 	uint32_t dda_ticks_X_substeps;	// DDA ticks scaled by substep factor
@@ -321,7 +320,8 @@ uint8_t stepper_isbusy(void);
 void st_reset(void);
 void st_cycle_start(void);
 void st_cycle_end(void);
-
+stat_t st_clc(cmdObj_t *cmd);
+	
 void st_energize_motors(void);
 void st_deenergize_motors(void);
 void st_set_motor_power(const uint8_t motor);
@@ -330,7 +330,7 @@ stat_t st_motor_power_callback(void);
 void st_request_exec_move(void);
 void st_prep_null(void);
 void st_prep_dwell(float microseconds);
-stat_t st_prep_line(float steps[], float microseconds);
+stat_t st_prep_line(float steps[], float microseconds, float step_error[]);
 
 stat_t st_set_sa(cmdObj_t *cmd);
 stat_t st_set_tr(cmdObj_t *cmd);
