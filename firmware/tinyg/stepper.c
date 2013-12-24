@@ -75,7 +75,7 @@ void stepper_init()
 	PORTCFG.VPCTRLA = PORTCFG_VP0MAP_PORT_MOTOR_1_gc | PORTCFG_VP1MAP_PORT_MOTOR_2_gc;
 	PORTCFG.VPCTRLB = PORTCFG_VP2MAP_PORT_MOTOR_3_gc | PORTCFG_VP3MAP_PORT_MOTOR_4_gc;
 
-	// setup ports
+	// setup ports and data structures
 	for (uint8_t i=0; i<MOTORS; i++) {
 		hw.st_port[i]->DIR = MOTOR_PORT_DIR_gm;  // sets outputs for motors & GPIO1, and GPIO2 inputs
 		hw.st_port[i]->OUT = MOTOR_ENABLE_BIT_bm;// zero port bits AND disable motor
@@ -91,19 +91,19 @@ void stepper_init()
 	TIMER_DWELL.INTCTRLA = TIMER_DWELL_INTLVL;	// interrupt mode
 
 	// setup software interrupt load timer
-	TIMER_LOAD.CTRLA = STEP_TIMER_DISABLE;		// turn timer off
-	TIMER_LOAD.CTRLB = STEP_TIMER_WGMODE;		// waveform mode
+	TIMER_LOAD.CTRLA = LOAD_TIMER_DISABLE;		// turn timer off
+	TIMER_LOAD.CTRLB = LOAD_TIMER_WGMODE;		// waveform mode
 	TIMER_LOAD.INTCTRLA = TIMER_LOAD_INTLVL;	// interrupt mode
-	TIMER_LOAD.PER = SWI_PERIOD;				// set period
+	TIMER_LOAD.PER = LOAD_TIMER_PERIOD;			// set period
 
 	// setup software interrupt exec timer
-	TIMER_EXEC.CTRLA = STEP_TIMER_DISABLE;		// turn timer off
-	TIMER_EXEC.CTRLB = STEP_TIMER_WGMODE;		// waveform mode
+	TIMER_EXEC.CTRLA = EXEC_TIMER_DISABLE;		// turn timer off
+	TIMER_EXEC.CTRLB = EXEC_TIMER_WGMODE;		// waveform mode
 	TIMER_EXEC.INTCTRLA = TIMER_EXEC_INTLVL;	// interrupt mode
-	TIMER_EXEC.PER = SWI_PERIOD;				// set period
+	TIMER_EXEC.PER = EXEC_TIMER_PERIOD;			// set period
 
 	st_pre.exec_state = PREP_BUFFER_OWNED_BY_EXEC;
-//	st_reset();									// reset steppers to known state
+	st_reset();									// reset steppers to known state
 }
 
 /*
@@ -339,22 +339,22 @@ ISR(TIMER_DWELL_ISR_vect) {								// DWELL timer interrupt
 }
 
 ISR(TIMER_LOAD_ISR_vect) {								// load steppers SW interrupt
- 	TIMER_LOAD.CTRLA = STEP_TIMER_DISABLE;				// disable SW interrupt timer
+	TIMER_LOAD.CTRLA = LOAD_TIMER_DISABLE;				// disable SW interrupt timer
 	_load_move();
 }
 
 ISR(TIMER_EXEC_ISR_vect) {								// exec move SW interrupt
- 	TIMER_EXEC.CTRLA = STEP_TIMER_DISABLE;				// disable SW interrupt timer
+	TIMER_EXEC.CTRLA = EXEC_TIMER_DISABLE;				// disable SW interrupt timer
 
 	// exec_move
-   	if (st_pre.exec_state == PREP_BUFFER_OWNED_BY_EXEC) {
-	   	if (mp_exec_move() != STAT_NOOP) {
-		   	st_pre.exec_state = PREP_BUFFER_OWNED_BY_LOADER; // flip it back
-		   	_request_load_move();
-	   	}
-   	}
-	
+	if (st_pre.exec_state == PREP_BUFFER_OWNED_BY_EXEC) {
+		if (mp_exec_move() != STAT_NOOP) {
+			st_pre.exec_state = PREP_BUFFER_OWNED_BY_LOADER; // flip it back
+			_request_load_move();
+		}
+	}
 }
+
 /****************************************************************************************
  * Exec sequencing code - computes and prepares next load segment
  * st_request_exec_move()	- SW interrupt to request to execute a move
@@ -369,18 +369,18 @@ ISR(TIMER_EXEC_ISR_vect) {								// exec move SW interrupt
 
 void st_request_exec_move()
 {
-	if (st_pre.exec_state == PREP_BUFFER_OWNED_BY_EXEC) {	// bother interrupting
-		TIMER_EXEC.PER = SWI_PERIOD;
-		TIMER_EXEC.CTRLA = STEP_TIMER_ENABLE;			// trigger a LO interrupt
+	if (st_pre.exec_state == PREP_BUFFER_OWNED_BY_EXEC) { // bother interrupting
+		TIMER_EXEC.PER = EXEC_TIMER_PERIOD;
+		TIMER_EXEC.CTRLA = EXEC_TIMER_ENABLE;			// trigger a LO interrupt
 	}
 }
 
 static void _request_load_move()
 {
 	if (st_run.dda_ticks_downcount == 0) {				// bother interrupting
-		TIMER_LOAD.PER = SWI_PERIOD;
-		TIMER_LOAD.CTRLA = STEP_TIMER_ENABLE;			// trigger a HI interrupt
-	} 	// else don't bother to interrupt. You'll just trigger an 
+		TIMER_LOAD.PER = LOAD_TIMER_PERIOD;
+		TIMER_LOAD.CTRLA = LOAD_TIMER_ENABLE;			// trigger a HI interrupt
+	} 	// else don't bother to interrupt. You'll just trigger an
 		// interrupt and find out the load routine is not ready for you
 }
 
@@ -532,8 +532,18 @@ static void _load_move()
  *	floats and converted to their appropriate integer types for the loader. 
  *
  * Args:
- *	steps[] are signed relative motion in steps (can be non-integer values)
- *	Microseconds - how many microseconds the segment should run 
+ *	  - steps[] are signed relative motion in steps for each motor. Steps are floats
+ *		that typically have fractional values (fractional steps). The sign indicates
+ *		direction. Motors that are not in the move should be 0 steps on input.
+ *
+ *	  - microseconds - how many microseconds the segment should run. If timing is not
+ *		100% accurate this will affect the move velocity, but not the distance traveled.
+ *
+ *	  - step_error[] is a vector of measured errors to the step count. Used for correction.
+ *
+ * NOTE:  Many of the expressions are sensitive to casting and execution order to avoid long-term
+ *		  accuracy errors due to floating point round off. One earlier failed attempt was:
+ *		    dda_ticks_X_substeps = (uint32_t)((microseconds/1000000) * f_dda * dda_substeps);
  */
 
 stat_t st_prep_line(float steps[], float microseconds, float step_error[])

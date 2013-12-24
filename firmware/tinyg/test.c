@@ -46,7 +46,10 @@
 #include "tests/test_051_braid.h"			// braid test - partial drawing
 
 #endif
-#include "tests/test_052_ford.h"			// Ford arc failure test - partial drawing
+
+#ifdef __TEST_99
+#include "tests/test_099.h"					// diagnostic test file. used to diagnose specific issues
+#endif
 
 /*
  * run_test() - system tests from FLASH invoked by $test=n command
@@ -77,7 +80,9 @@ uint8_t run_test(cmdObj_t *cmd)
 		case 50: { xio_open(XIO_DEV_PGM, PGMFILE(&test_mudflap),PGM_FLAGS); break;}
 		case 51: { xio_open(XIO_DEV_PGM, PGMFILE(&test_braid),PGM_FLAGS); break;}
 #endif
-		case 52: { xio_open(XIO_DEV_PGM, PGMFILE(&test_ford),PGM_FLAGS); break;}
+#ifdef __TEST_99
+		case 99: { xio_open(XIO_DEV_PGM, PGMFILE(&test_99),PGM_FLAGS); break;}
+#endif
 		default: {
 			fprintf_P(stderr,PSTR("Test #%d not found\n"),(uint8_t)cmd->value);
 			return (STAT_ERROR);
@@ -104,10 +109,12 @@ void run_canned_startup()	// uncomment in tinyg.h if you want to run this
 //	xio_queue_RX_string_usb("$tool\n");
 
 /* Run test file */
-//	xio_queue_RX_string_usb("$test=51\n");		// run test file
-//	xio_queue_RX_string_usb("{\"test\":52}\n");	// run test file
+//	xio_queue_RX_string_usb("$test=99\n");		// run test file
+//	xio_queue_RX_string_usb("{\"test\":99}\n");	// run test file
 //	xio_queue_RX_string_usb("g28.2z0\n");
 //	xio_queue_RX_string_usb("{\"jogx\":1}\n");
+
+	xio_queue_RX_string_usb("{\"uda\":{\"0\":\"0x4\"}}\n");
 
 /* Other command sequences */
 //	xio_queue_RX_string_usb("H\n");				// show help file

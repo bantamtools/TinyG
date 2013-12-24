@@ -100,6 +100,8 @@ void cmd_persist(cmdObj_t *cmd)
  *
  *	You can assume the cfg struct has been zeroed by a hard reset. 
  *	Do not clear it as the version and build numbers have already been set by tg_init()
+ *
+ * NOTE: Config assertions are handled from the controller
  */
 void config_init()
 {
@@ -179,7 +181,8 @@ stat_t get_ui8(cmdObj_t *cmd)
 
 stat_t get_int(cmdObj_t *cmd)
 {
-	cmd->value = (float)*((uint32_t *)GET_TABLE_WORD(target));
+//	cmd->value = (float)*((uint32_t *)GET_TABLE_WORD(target));
+	cmd->value = *((uint32_t *)GET_TABLE_WORD(target));
 	cmd->objtype = TYPE_INTEGER;
 	return (STAT_OK);
 }
@@ -238,7 +241,8 @@ stat_t set_0123(cmdObj_t *cmd)
 
 stat_t set_int(cmdObj_t *cmd)
 {
-	*((uint32_t *)GET_TABLE_WORD(target)) = cmd->value;
+//	*((uint32_t *)GET_TABLE_WORD(target)) = cmd->value;
+	*((uint32_t *)GET_TABLE_WORD(target)) = (uint32_t)cmd->value;
 	cmd->objtype = TYPE_INTEGER;
 	return(STAT_OK);
 }
@@ -403,14 +407,14 @@ uint8_t cmd_group_is_prefixed(char_t *group)
 index_t cmd_get_index(const char_t *group, const char_t *token)
 {
 	char_t c;
-//	char_t str[TOKEN_LEN+1];
-	char_t str[TOKEN_LEN + GROUP_LEN + 1];	// should actually never be more than TOKEN_LEN+1
-	strncpy(str, group, GROUP_LEN);
-	strcat(str, token);
+	char_t str[TOKEN_LEN + GROUP_LEN+1];	// should actually never be more than TOKEN_LEN+1
+	strncpy(str, group, GROUP_LEN+1);
+	strncat(str, token, TOKEN_LEN+1);
 
+	index_t i;
 	index_t index_max = cmd_index_max();
 
-	for (index_t i=0; i < index_max; i++) {
+	for (i=0; i < index_max; i++) {
 		if ((c = GET_TOKEN_BYTE(token[0])) != str[0]) {	continue; }					// 1st character mismatch
 		if ((c = GET_TOKEN_BYTE(token[1])) == NUL) { if (str[1] == NUL) return(i);}	// one character match
 		if (c != str[1]) continue;													// 2nd character mismatch
@@ -641,6 +645,7 @@ cmdObj_t *cmd_add_float(const char_t *token, const float value)	// add a float o
 	return (NULL);
 }
 
+// ASSUMES A RAM STRING. If you need to post a FLASH string use pstr2str to convert it to a RAM string
 cmdObj_t *cmd_add_string(const char_t *token, const char_t *string) // add a string object to the body
 {
 	cmdObj_t *cmd = cmd_body;
@@ -657,6 +662,12 @@ cmdObj_t *cmd_add_string(const char_t *token, const char_t *string) // add a str
 	}
 	return (NULL);
 }
+
+/*
+ * cm_conditional_message() - queue a RAM string as a message in the response (conditionally)
+ *
+ *	Note: If you need to post a FLASH string use pstr2str to convert it to a RAM string
+ */
 
 cmdObj_t *cmd_add_conditional_message(const char_t *string)	// conditionally add a message object to the body
 {
