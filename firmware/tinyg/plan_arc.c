@@ -331,7 +331,7 @@ static stat_t _compute_arc_offsets_from_radius()
 	float y = cm.gm.target[arc.plane_axis_1] - cm.gmx.position[arc.plane_axis_1];
 
 	// == -(h * 2 / d)
-	float h_x2_div_d = -sqrt(4 * square(arc.radius) - (square(x) - square(y))) / hypot(x,y);
+	float h_x2_div_d = -sqrt(4 * square(arc.radius) - (square(x) + square(y))) / hypot(x,y);
 
 	// If r is smaller than d the arc is now traversing the complex plane beyond
 	// the reach of any real CNC, and thus - for practical reasons - we will 
