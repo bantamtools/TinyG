@@ -87,11 +87,17 @@ typedef struct qrSingleton {		// data for queue reports
 	uint32_t init_tick;				// time when values were last initialized or cleared
 
 } qrSingleton_t;
+    
+typedef struct rxSingleton {
+    uint8_t rx_report_requested;
+    uint16_t space_available;       // space available in usb rx buffer at time of request
+} rxSingleton_t;
 
 /**** Externs - See report.c for allocation ****/
 
 extern srSingleton_t sr;
 extern qrSingleton_t qr;
+extern rxSingleton_t rx;
 
 /**** Function Prototypes ****/
 
@@ -117,6 +123,9 @@ stat_t sr_set_si(cmdObj_t *cmd);
 void qr_init_queue_report(void);
 void qr_request_queue_report(int8_t buffers);
 stat_t qr_queue_report_callback(void);
+    
+void rx_request_rx_report(void);
+stat_t rx_report_callback(void);
 
 stat_t qr_get(cmdObj_t *cmd);
 stat_t qi_get(cmdObj_t *cmd);
