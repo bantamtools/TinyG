@@ -241,7 +241,7 @@ static stat_t _command_dispatch()
 
 		case '!': { cm_request_feedhold(); break; }		// include for AVR diagnostics and ARM serial
 		case '%': { cm_request_queue_flush(); break; }
-		case '~': { cm_request_cycle_start(); break; }
+		case '~': { cm_request_end_hold(); break; }
 
 		case NUL: { 									// blank line (just a CR)
 			if (cfg.comm_mode != JSON_MODE) {

@@ -43,6 +43,8 @@
 #define JUNCTION_DEVIATION			0.01		// default value, in mm
 #define JUNCTION_ACCELERATION		100000		// centripetal acceleration around corners
 #define LATCH_VELOCITY				25			// reeeeally slow for accuracy
+#undef PAUSE_DWELL_TIME
+#define PAUSE_DWELL_TIME     1.5       // after unpausing & turning spindle on, dwell for 1.5s
 
 // WARNING: Older Othermill machines use a 15deg can stack for their Z axis.
 // new machines use a stepper which has the same config as the other axis.
@@ -52,7 +54,7 @@
 // Note: there are some commented test values below
 
 #undef  SR_DEFAULTS
-#define SR_DEFAULTS  "mpox","mpoy","mpoz","mpoa","ofsx","ofsy","ofsz","ofsa","unit","stat","coor","momo","dist","home","hold","macs","cycs","mots","plan","prbe"
+#define SR_DEFAULTS  "mpox","mpoy","mpoz","ofsx","ofsy","ofsz","g55x","g55y","g55z","unit","stat","coor","momo","dist","home","hold","macs","cycs","mots","plan","prbe"
 
 #undef	SWITCH_TYPE
 #define SWITCH_TYPE 				SW_TYPE_NORMALLY_CLOSED

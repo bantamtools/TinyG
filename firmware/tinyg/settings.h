@@ -46,6 +46,7 @@
 #define SWITCH_TYPE 				SW_TYPE_NORMALLY_OPEN// one of: SW_TYPE_NORMALLY_OPEN, SW_TYPE_NORMALLY_CLOSED
 #define MOTOR_IDLE_TIMEOUT			2.00			// seconds to maintain motor at full power before idling
 #define MOTOR_POWER_LEVEL			25				// default motor power level (ARM only)
+#define PAUSE_DWELL_TIME     0.0        //disable spindle-pause feature by default
 
 // Communications and reporting settings
 #define COMM_MODE					JSON_MODE		// one of: TEXT_MODE, JSON_MODE

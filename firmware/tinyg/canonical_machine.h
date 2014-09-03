@@ -244,17 +244,20 @@ typedef struct cmSingleton {		// struct to manage cm globals and cycles
 	uint8_t homing_state;			// home: homing cycle sub-state machine
 	uint8_t homed[AXES];			// individual axis homing flags
 
-    uint8_t probe_state;            // 1==success, 0==failed
-    float   probe_results[AXES];    // probing results
+	uint8_t probe_state;            // 1==success, 0==failed
+	float   probe_results[AXES];    // probing results
 
 	uint8_t	g28_flag;				// true = complete a G28 move
 	uint8_t	g30_flag;				// true = complete a G30 move
 	uint8_t g10_persist_flag;		//.G10 changed offsets - persist them
 	uint8_t feedhold_requested;		// feedhold character has been received
 	uint8_t queue_flush_requested;	// queue flush character has been received
-	uint8_t cycle_start_requested;	// cycle start character has been received (flag to end feedhold)
+	uint8_t end_hold_requested;	    // end hold character has been received
 	float jogging_dest;				// jogging direction as a relative move from current position
 	struct GCodeState *am;			// active Gcode model is maintained by state management
+
+	float pause_dwell_time;			// how long to dwell after ramping spindle up during a feedhold end
+	uint8_t paused_spindle_state;		// if we're in a hold, what the spindle state was before pausing
 
 	/**** Model states ****/
 	GCodeState_t  gm;				// core gcode model state
@@ -556,6 +559,9 @@ stat_t cm_clear(cmdObj_t *cmd);
 
 stat_t cm_queue_flush(void);									// flush serial and planner queues with coordinate resets
 
+stat_t cm_start_hold(void);                                     // start or end a feedhold
+stat_t cm_end_hold(void);
+
 stat_t cm_select_plane(uint8_t plane);							// G17, G18, G19
 stat_t cm_set_units_mode(uint8_t mode);							// G20, G21
 
@@ -617,7 +623,7 @@ void cm_message(char_t *message);								// msg to console (e.g. Gcode comments)
 stat_t cm_feedhold_sequencing_callback(void);					// process feedhold, cycle start and queue flush requests
 void cm_request_feedhold(void);
 void cm_request_queue_flush(void);
-void cm_request_cycle_start(void);
+void cm_request_end_hold(void);
 
 void cm_cycle_start(void);										// (no Gcode)
 void cm_cycle_end(void); 										// (no Gcode)
@@ -725,6 +731,8 @@ stat_t cm_set_jrk(cmdObj_t *cmd);		// set jerk with 1,000,000 correction
 	void cm_print_cofs(cmdObj_t *cmd);
 	void cm_print_cpos(cmdObj_t *cmd);
 
+	void cm_print_pdt(cmdObj_t *cmd);
+
 #else // __TEXT_MODE
 
 	#define cm_print_vel tx_print_stub		// model state reporting
@@ -781,6 +789,8 @@ stat_t cm_set_jrk(cmdObj_t *cmd);		// set jerk with 1,000,000 correction
 	#define cm_print_zb tx_print_stub
 	#define cm_print_cofs tx_print_stub
 	#define cm_print_cpos tx_print_stub
+
+	#define cm_print_pdt tx_print_stub
 
 #endif // __TEXT_MODE
 

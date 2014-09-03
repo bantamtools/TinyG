@@ -414,8 +414,10 @@ void st_set_motor_power(const uint8_t motor);
 stat_t st_motor_power_callback(void);
 
 void st_request_exec_move(void);
+void st_request_load_move(void);
 void st_prep_null(void);
 void st_prep_dwell(float microseconds);
+void st_request_out_of_band_dwell(float microseconds);
 //stat_t st_prep_line(float travel_steps[], float following_error[], float segment_time, const uint8_t segment_time_change);
 stat_t st_prep_line(float travel_steps[], float following_error[], float segment_time);
 

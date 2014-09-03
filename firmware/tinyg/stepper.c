@@ -47,7 +47,6 @@ static stRunSingleton_t st_run;
 /**** Setup local functions ****/
 
 static void _load_move(void);
-static void _request_load_move(void);
 
 // handy macro
 #define _f_to_period(f) (uint16_t)((float)F_CPU / (float)f)
@@ -346,7 +345,7 @@ ISR(TIMER_EXEC_ISR_vect) {								// exec move SW interrupt
 	if (st_pre.exec_state == PREP_BUFFER_OWNED_BY_EXEC) {
 		if (mp_exec_move() != STAT_NOOP) {
 			st_pre.exec_state = PREP_BUFFER_OWNED_BY_LOADER; // flip it back
-			_request_load_move();
+			st_request_load_move();
 		}
 	}
 }
@@ -360,7 +359,7 @@ ISR(TIMER_EXEC_ISR_vect) {								// exec move SW interrupt
 /* Software interrupts
  *
  * st_request_exec_move() - SW interrupt to request to execute a move
- * _request_load_move()   - SW interrupt to request to load a move
+ * st_request_load_move()   - SW interrupt to request to load a move
  */
 
 void st_request_exec_move()
@@ -371,7 +370,7 @@ void st_request_exec_move()
 	}
 }
 
-static void _request_load_move()
+void st_request_load_move()
 {
 	if (st_run.dda_ticks_downcount == 0) {				// bother interrupting
 		TIMER_LOAD.PER = LOAD_TIMER_PERIOD;
@@ -707,6 +706,18 @@ void st_prep_dwell(float microseconds)
 	st_pre.move_type = MOVE_TYPE_DWELL;
 	st_pre.dda_period = _f_to_period(FREQUENCY_DWELL);
 	st_pre.dda_ticks = (uint32_t)((microseconds/1000000) * FREQUENCY_DWELL);
+}
+
+/*
+ * st_request_out_of_band_dwell(float microseconds)
+ * (only usable while exec isn't running, e.g. in feedhold or stopped states...)
+ * add a dwell to the loader without going through the planner buffers
+ */
+void st_request_out_of_band_dwell(float microseconds)
+{
+    st_prep_dwell(microseconds);
+    st_pre.exec_state = PREP_BUFFER_OWNED_BY_LOADER;
+    st_request_load_move();
 }
 
 /*

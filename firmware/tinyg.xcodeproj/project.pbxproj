@@ -205,7 +205,6 @@
 		204C2F59183D4B960058D2F2 /* tinyg */ = {
 			isa = PBXGroup;
 			children = (
-				E2A8011F19B6815F006E7C15 /* plan_exec.c */,
 				20018E811852910E00634338 /* encoder.c */,
 				20018E821852910E00634338 /* encoder.h */,
 				204C2F5A183D4B960058D2F2 /* canonical_machine.c */,
@@ -241,6 +240,7 @@
 				204C2FDD183D4B970058D2F2 /* plan_arc.c */,
 				204C2FDE183D4B970058D2F2 /* plan_arc.h */,
 				204C2FDF183D4B970058D2F2 /* plan_line.c */,
+				E2A8011F19B6815F006E7C15 /* plan_exec.c */,
 				204C2FE1183D4B970058D2F2 /* planner.c */,
 				204C2FE2183D4B970058D2F2 /* planner.h */,
 				204C2FE3183D4B970058D2F2 /* pwm.c */,

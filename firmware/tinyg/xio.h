@@ -267,7 +267,7 @@ enum xioSignals {
 
 #define CHAR_RESET CAN
 #define CHAR_FEEDHOLD (char)'!'
-#define CHAR_CYCLE_START (char)'~'
+#define CHAR_END_HOLD (char)'~'
 #define CHAR_QUEUE_FLUSH (char)'%'
 //#define CHAR_BOOTLOADER ESC
 

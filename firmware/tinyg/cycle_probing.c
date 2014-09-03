@@ -233,36 +233,30 @@ static stat_t _probing_finish()
 // called when exiting on success or error
 static void _probe_restore_settings()
 {
-	// mp_flush_planner(); 						// we should be stopped now, but in case of switch closure
-	cm_queue_flush();	
-	qr_request_queue_report(0);	
+	mp_flush_planner(); 						// we should be stopped now, but in case of switch closure
+	if(cm.hold_state == FEEDHOLD_HOLD)
+		cm_end_hold();
     
-    // restore switch settings
-    sw.switch_type = pb.saved_switch_type;
-    for( uint8_t i=0; i<NUM_SWITCHES; i++ )
-        sw.mode[i] = pb.saved_switch_mode[i];
+	// restore switch settings
+	sw.switch_type = pb.saved_switch_type;
+	for( uint8_t i=0; i<NUM_SWITCHES; i++ )
+		sw.mode[i] = pb.saved_switch_mode[i];
 	switch_init();								// re-init to pick up changes
 
-    // restore axis jerk
-    for( uint8_t axis=0; axis<AXES; axis++ )
-        cm.a[axis].jerk_max = pb.saved_jerk[axis];
+	// restore axis jerk
+	for( uint8_t axis=0; axis<AXES; axis++ )
+		cm.a[axis].jerk_max = pb.saved_jerk[axis];
 
-    // restore coordinate system and distance mode
-    cm_set_coord_system(pb.saved_coord_system);
-    cm_set_distance_mode(pb.saved_distance_mode);
+	// restore coordinate system and distance mode
+	cm_set_coord_system(pb.saved_coord_system);
+	cm_set_distance_mode(pb.saved_distance_mode);
 
 	// update the model with actual position
 
 	cm_set_motion_mode(MODEL, MOTION_MODE_CANCEL_MOTION_MODE);
-	cm_set_motion_state(MOTION_STOP);			// also sets ACTIVE_MODEL
-	cm.machine_state = MACHINE_PROGRAM_STOP;
 	cm.cycle_state = CYCLE_OFF;
 	cm.hold_state = FEEDHOLD_OFF;
-//	cm_request_cycle_start();					// clear feedhold state
-//	cm_cycle_end();
-//	cm_program_stop();
-
-    printf_P(PSTR("(cm.cycle_state %i)\n"), cm.cycle_state);
+  cm_cycle_end();
 }
 
 static stat_t _probing_finalize_exit()

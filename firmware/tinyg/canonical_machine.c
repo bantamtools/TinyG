@@ -575,7 +575,8 @@ void canonical_machine_init()
 	// reset request flags
 	cm.feedhold_requested = false;
 	cm.queue_flush_requested = false;
-	cm.cycle_start_requested = false;
+	cm.end_hold_requested = false;
+	cm.paused_spindle_state = SPINDLE_OFF;
 
 	ACTIVE_MODEL = MODEL;			// setup initial Gcode model pointer
 
@@ -1224,7 +1225,7 @@ void cm_message(char_t *message)
 /*
  * cm_request_feedhold()
  * cm_request_queue_flush()
- * cm_request_cycle_start()
+ * cm_request_end_hold()
  * cm_feedhold_sequencing_callback() - process feedholds, cycle starts & queue flushes
  * cm_flush_planner() - Flush planner queue and correct model positions
  *
@@ -1251,16 +1252,15 @@ void cm_message(char_t *message)
 
 void cm_request_feedhold(void) { cm.feedhold_requested = true; }
 void cm_request_queue_flush(void) { cm.queue_flush_requested = true; }
-void cm_request_cycle_start(void) { cm.cycle_start_requested = true; }
+void cm_request_end_hold(void) { cm.end_hold_requested = true; }
 
 stat_t cm_feedhold_sequencing_callback()
 {
 	if (cm.feedhold_requested == true) {
-		if ((cm.motion_state == MOTION_RUN) && (cm.hold_state == FEEDHOLD_OFF)) {
-			cm_set_motion_state(MOTION_HOLD);
-			cm.hold_state = FEEDHOLD_SYNC;	// invokes hold from aline execution
-		}
 		cm.feedhold_requested = false;
+		if ((cm.motion_state == MOTION_RUN) && (cm.hold_state == FEEDHOLD_OFF)) {
+			cm_start_hold();
+		}
 	}
 	if (cm.queue_flush_requested == true) {
 		if ((cm.motion_state == MOTION_STOP) ||
@@ -1269,18 +1269,38 @@ stat_t cm_feedhold_sequencing_callback()
 			cm_queue_flush();
 		}
 	}
-    bool feedhold_processing =
-        cm.hold_state == FEEDHOLD_SYNC ||
-        cm.hold_state == FEEDHOLD_PLAN ||
-        cm.hold_state == FEEDHOLD_DECEL;
-	if ((cm.cycle_start_requested == true) && (cm.queue_flush_requested == false) &&
-        !feedhold_processing) {
-		cm.cycle_start_requested = false;
-		cm.hold_state = FEEDHOLD_END_HOLD;
-		cm_cycle_start();
-		mp_end_hold();
+	if ((cm.end_hold_requested == true) && (cm.queue_flush_requested == false)) {
+        cm.end_hold_requested = false;
+        if(cm.hold_state == FEEDHOLD_HOLD) {
+            cm_end_hold();
+        }
 	}
 	return (STAT_OK);
+}
+
+stat_t cm_start_hold()
+{
+    cm_set_motion_state(MOTION_HOLD);
+    cm.hold_state = FEEDHOLD_SYNC;	// invokes hold from aline execution
+    return STAT_OK;
+}
+
+stat_t cm_end_hold()
+{
+    cm.hold_state = FEEDHOLD_END_HOLD;
+    cm_cycle_start();
+    mp_end_hold();
+    if(cm.motion_state == MOTION_RUN) {
+        if(cm.pause_dwell_time > 0 && cm_unpause_spindle()) {
+            st_request_out_of_band_dwell((uint32_t)(cm.pause_dwell_time * 1000000));
+        } else {
+            st_request_exec_move();
+        }
+    } else {
+        cm.paused_spindle_state = SPINDLE_OFF;
+        st_request_exec_move();
+    }
+    return STAT_OK;
 }
 
 stat_t cm_queue_flush()
@@ -1349,8 +1369,9 @@ static void _exec_program_finalize(float *value, float *flag)
 		cm.cycle_state = CYCLE_OFF;					// don't end cycle if homing, probing, etc.
 	}
 	cm.hold_state = FEEDHOLD_OFF;					// end feedhold (if in feed hold)
-	cm.cycle_start_requested = false;				// cancel any pending cycle start request
+	cm.end_hold_requested = false;				// cancel any pending cycle start request
 	mp_zero_segment_velocity();						// for reporting purposes
+	cm.paused_spindle_state = SPINDLE_OFF;
 
 	// execute program END resets
 	if (cm.machine_state == MACHINE_PROGRAM_END) {
@@ -1478,7 +1499,8 @@ static const char msg_hold1[] PROGMEM = "Sync";
 static const char msg_hold2[] PROGMEM = "Plan";
 static const char msg_hold3[] PROGMEM = "Decel";
 static const char msg_hold4[] PROGMEM = "Hold";
-static const char *const msg_hold[] PROGMEM = { msg_hold0, msg_hold1, msg_hold2, msg_hold3, msg_hold4 };
+static const char msg_hold5[] PROGMEM = "End Hold";
+static const char *const msg_hold[] PROGMEM = { msg_hold0, msg_hold1, msg_hold2, msg_hold3, msg_hold4, msg_hold5 };
 
 static const char msg_home0[] PROGMEM = "Not Homed";
 static const char msg_home1[] PROGMEM = "Homed";
@@ -1869,13 +1891,16 @@ const char fmt_sl[] PROGMEM = "[sl]  soft limit enable%12d\n";
 const char fmt_ml[] PROGMEM = "[ml]  min line segment%17.3f%s\n";
 const char fmt_ma[] PROGMEM = "[ma]  min arc segment%18.3f%s\n";
 const char fmt_ms[] PROGMEM = "[ms]  min segment time%13.0f uSec\n";
+const char fmt_pdt[] PROGMEM = "[pdt] pause dwell time%13.0f uSec\n";
 
 void cm_print_ja(cmdObj_t *cmd) { text_print_flt_units(cmd, fmt_ja, GET_UNITS(ACTIVE_MODEL));}
 void cm_print_ct(cmdObj_t *cmd) { text_print_flt_units(cmd, fmt_ct, GET_UNITS(ACTIVE_MODEL));}
 void cm_print_sl(cmdObj_t *cmd) { text_print_ui8(cmd, fmt_sl);}
 void cm_print_ml(cmdObj_t *cmd) { text_print_flt_units(cmd, fmt_ml, GET_UNITS(ACTIVE_MODEL));}
 void cm_print_ma(cmdObj_t *cmd) { text_print_flt_units(cmd, fmt_ma, GET_UNITS(ACTIVE_MODEL));}
-void cm_print_ms(cmdObj_t *cmd) { text_print_flt_units(cmd, fmt_ms, GET_UNITS(ACTIVE_MODEL));}
+void cm_print_ms(cmdObj_t *cmd) { text_print_flt(cmd, fmt_ms);}
+
+void cm_print_pdt(cmdObj_t *cmd) { text_print_flt(cmd, fmt_pdt);}
 
 /*
  * axis print functions
