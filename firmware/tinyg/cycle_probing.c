@@ -211,11 +211,10 @@ static stat_t _probing_finish()
     int8_t probe = read_switch(pb.probe_switch);
     cm.probe_state = (probe==SW_CLOSED) ? PROBE_SUCCEDED : PROBE_FAILED;
 
-    for( uint8_t axis=0; axis<AXES; axis++ )
-        cm.probe_results[axis] = cm_get_absolute_position(ACTIVE_MODEL, axis);
-
-    // if we got here because of a feed hold we need to keep the model position correct
-	cm_set_model_position_from_runtime(STAT_OK);
+    for( uint8_t axis=0; axis<AXES; axis++ ) {
+        cm.probe_results[axis] = cm_get_absolute_position(RUNTIME, axis);
+        cm_set_axis_origin(axis, cm_get_work_position(RUNTIME, axis));
+    }
 
     json_parser("{\"prb\":null}"); // TODO: verify that this is OK to do...
     // printf_P(PSTR("{\"prb\":{\"e\":%i"), (int)cm.probe_state);
@@ -255,8 +254,7 @@ static void _probe_restore_settings()
 
 	cm_set_motion_mode(MODEL, MOTION_MODE_CANCEL_MOTION_MODE);
 	cm.cycle_state = CYCLE_OFF;
-	cm.hold_state = FEEDHOLD_OFF;
-  cm_cycle_end();
+	cm_cycle_end();
 }
 
 static stat_t _probing_finalize_exit()
