@@ -128,6 +128,8 @@ const cfgItem_t cfgArray[] PROGMEM = {
 	{ "",   "frmo",_f00, 0, cm_print_frmo, cm_get_frmo, set_nul,(float *)&cs.null, 0 },	// feed rate mode
 	{ "",   "tool",_f00, 0, cm_print_tool, cm_get_toolv,set_nul,(float *)&cs.null, 0 },	// active tool
 //	{ "",   "tick",_f00, 0, tx_print_int,  get_int,     set_int,(float *)&rtc.sys_ticks, 0 },// tick count
+	{ "",   "spc" ,_f00, 0, cm_print_spc,  get_ui8,     set_nul,(float *)&cm.gm.spindle_mode, 0 }, // spindle state
+	{ "",   "sps" ,_f00, 0, cm_print_sps,  get_flt,     set_nul,(float *)&cm.gm.spindle_speed, 0 }, // spindle speed
 
 	{ "mpo","mpox",_f00, 3, cm_print_mpo, cm_get_mpo, set_nul,(float *)&cs.null, 0 },	// X machine position
 	{ "mpo","mpoy",_f00, 3, cm_print_mpo, cm_get_mpo, set_nul,(float *)&cs.null, 0 },	// Y machine position

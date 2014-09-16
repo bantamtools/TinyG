@@ -693,6 +693,8 @@ stat_t cm_set_jrk(cmdObj_t *cmd);		// set jerk with 1,000,000 correction
 	void cm_print_dist(cmdObj_t *cmd);
 	void cm_print_frmo(cmdObj_t *cmd);
 	void cm_print_tool(cmdObj_t *cmd);
+	void cm_print_spc(cmdObj_t *cmd);
+	void cm_print_sps(cmdObj_t *cmd);
 
 	void cm_print_gpl(cmdObj_t *cmd);		// Gcode defaults
 	void cm_print_gun(cmdObj_t *cmd);
@@ -752,6 +754,8 @@ stat_t cm_set_jrk(cmdObj_t *cmd);		// set jerk with 1,000,000 correction
 	#define cm_print_dist tx_print_stub
 	#define cm_print_frmo tx_print_stub
 	#define cm_print_tool tx_print_stub
+	#define cm_print_spc tx_print_stub
+	#define cm_print_sps tx_print_stub
 
 	#define cm_print_gpl tx_print_stub		// Gcode defaults
 	#define cm_print_gun tx_print_stub

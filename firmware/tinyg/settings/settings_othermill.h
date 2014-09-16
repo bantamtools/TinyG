@@ -54,7 +54,7 @@
 // Note: there are some commented test values below
 
 #undef  SR_DEFAULTS
-#define SR_DEFAULTS  "mpox","mpoy","mpoz","ofsx","ofsy","ofsz","g55x","g55y","g55z","unit","stat","coor","momo","dist","home","hold","macs","cycs","mots","plan","prbe"
+#define SR_DEFAULTS  "mpox","mpoy","mpoz","ofsx","ofsy","ofsz","g55x","g55y","g55z","unit","stat","coor","momo","dist","home","mots","plan","line","path","frmo","prbe","spc"
 
 #undef	SWITCH_TYPE
 #define SWITCH_TYPE 				SW_TYPE_NORMALLY_CLOSED
