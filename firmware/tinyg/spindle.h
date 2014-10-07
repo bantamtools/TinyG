@@ -40,13 +40,12 @@ void cm_spindle_init();
 
 stat_t cm_set_spindle_speed(float speed);			// S parameter
 
-stat_t cm_spindle_control(uint8_t spindle_mode);	// M3, M4, M5 integrated spindle control
+// M3, M4, M5 integrated spindle control
+stat_t cm_spindle_control(uint8_t spindle_mode);
 
-//shuts the spindle off and remembers its mode... does not go through planner
+// turn the spindle on/off...do not go through planner or alter the spindle_mode in the model
 void cm_pause_spindle();
-//returns spindle to remembered state; does not go through planner
-//if this returns true, a dwell is needed before ending feedhold
-bool cm_unpause_spindle();
+bool cm_unpause_spindle(); //if this returns true, a dwell is needed before ending feedhold
 
 #ifdef __cplusplus
 }

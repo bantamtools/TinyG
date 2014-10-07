@@ -576,7 +576,6 @@ void canonical_machine_init()
 	cm.feedhold_requested = false;
 	cm.queue_flush_requested = false;
 	cm.end_hold_requested = false;
-	cm.paused_spindle_state = SPINDLE_OFF;
 
 	ACTIVE_MODEL = MODEL;			// setup initial Gcode model pointer
 
@@ -1258,11 +1257,13 @@ stat_t cm_feedhold_sequencing_callback()
 {
 	if (cm.feedhold_requested == true) {
 		cm.feedhold_requested = false;
-		if ((cm.motion_state == MOTION_RUN) && (cm.hold_state == FEEDHOLD_OFF)) {
-			cm_start_hold();
-		} else if(cm.pause_dwell_time > 0 && cm.gm.spindle_mode != SPINDLE_OFF) {
-			cm_pause_spindle();
-			cm.paused_spindle_state = SPINDLE_OFF;
+		if (cm.hold_state == FEEDHOLD_OFF) {
+			if (cm.motion_state == MOTION_RUN) {
+				cm_start_hold();
+			} else if(cm.pause_dwell_time > 0 && cm.gm.spindle_mode != SPINDLE_OFF) {
+				cm_pause_spindle();
+        	    cm.gm.spindle_mode = SPINDLE_OFF;
+			}
 		}
 	}
 	if (cm.queue_flush_requested == true) {
@@ -1299,8 +1300,7 @@ stat_t cm_end_hold()
         } else {
             st_request_exec_move();
         }
-    } else
-        cm.paused_spindle_state = SPINDLE_OFF;
+    }
     return STAT_OK;
 }
 
@@ -1381,7 +1381,6 @@ static void _exec_program_finalize(float *value, float *flag)
 		cm_select_plane(cm.select_plane);			// reset to default arc plane
 		cm_set_distance_mode(cm.distance_mode);
 		cm_set_units_mode(cm.units_mode);			// reset to default units mode
-		cm.paused_spindle_state = SPINDLE_OFF;
 		cm_spindle_control(SPINDLE_OFF);			// M5
 		cm_flood_coolant_control(false);			// M9
 		cm_set_inverse_feed_rate_mode(false);
