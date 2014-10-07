@@ -1300,7 +1300,8 @@ stat_t cm_end_hold()
         } else {
             st_request_exec_move();
         }
-    }
+    } else
+        cm.gm.spindle_mode = SPINDLE_OFF;
     return STAT_OK;
 }
 
