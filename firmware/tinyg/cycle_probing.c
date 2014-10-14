@@ -212,8 +212,9 @@ static stat_t _probing_finish()
     cm.probe_state = (probe==SW_CLOSED) ? PROBE_SUCCEDED : PROBE_FAILED;
 
     for( uint8_t axis=0; axis<AXES; axis++ ) {
-        cm.probe_results[axis] = cm_get_absolute_position(RUNTIME, axis);
-        cm_set_axis_origin(axis, cm_get_work_position(RUNTIME, axis));
+        float position = cm_get_absolute_position(RUNTIME, axis);
+        cm_set_axis_origin(axis, position);
+        cm.probe_results[axis] = position;
     }
 
     json_parser("{\"prb\":null}"); // TODO: verify that this is OK to do...
